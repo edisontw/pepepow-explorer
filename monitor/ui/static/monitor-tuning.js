@@ -1,5 +1,9 @@
 // Calmer public monitor presentation overrides. Loaded after monitor.js.
 
+let cachedPepepowPriceUsdt = null;
+let priceFetchInFlight = false;
+let latestRewardSnapshot = null;
+
 function alertPresentation(alert) {
   const type = alert?.type || "";
   if (type === "fork_config_error") {
@@ -179,6 +183,213 @@ function renderStatusBanner(snapshot) {
   metaEl.textContent = metaParts.join("  ·  ");
 }
 
+function estimateHashrateDisplay(snapshot) {
+  if (snapshot.hashrate_display && snapshot.hashrate_display !== "-") {
+    return snapshot.hashrate_display;
+  }
+  const difficulty = Number(snapshot.difficulty);
+  const blockTime = Number(snapshot.avg_block_time_8m || snapshot.avg_block_time_30m || snapshot.avg_block_time_2h || 0);
+  if (!Number.isFinite(difficulty) || difficulty <= 0 || !Number.isFinite(blockTime) || blockTime <= 0) {
+    return "-";
+  }
+  return formatHashrateValue((difficulty * 4294967296) / blockTime);
+}
+
+function formatHashrateValue(value) {
+  const units = ["H/s", "KH/s", "MH/s", "GH/s", "TH/s", "PH/s"];
+  let amount = Math.max(0, Number(value) || 0);
+  let index = 0;
+  while (amount >= 1000 && index < units.length - 1) {
+    amount /= 1000;
+    index += 1;
+  }
+  return `${amount.toFixed(4)} ${units[index]}`;
+}
+
+function compatibleEnabledDisplay(snapshot) {
+  const enabled = Number(snapshot.masternode_enabled || 0);
+  const upgraded = Number(snapshot.masternode_upgraded_enabled || 0);
+  const legacy = Number(snapshot.masternode_legacy_enabled || 0);
+  const unknown = Number(snapshot.masternode_unknown_enabled || 0);
+  if (upgraded > 0) {
+    return formatNumber(upgraded);
+  }
+  if (enabled > 0 && legacy === 0 && unknown >= enabled) {
+    return `${formatNumber(enabled)} checking`;
+  }
+  return formatNumber(upgraded);
+}
+
+function renderMasternodes(snapshot) {
+  setText("mn-enabled", formatNumber(snapshot.masternode_enabled));
+  setText("mn-total", formatNumber(snapshot.masternode_total));
+  setText("mn-upgraded", compatibleEnabledDisplay(snapshot));
+  setText("mn-legacy", formatNumber(snapshot.masternode_legacy_enabled));
+  setText("mn-upgrade-ratio", snapshot.masternode_upgraded_enabled > 0 ? formatPercent(snapshot.upgrade_ratio) : "Checking");
+
+  const compatDiv = byId("mn-compatibility-summary");
+  if (compatDiv) {
+    compatDiv.innerHTML = "";
+    const alertDiv = document.createElement("div");
+    if (snapshot.masternode_legacy_enabled > 0) {
+      alertDiv.className = "alert-item warning";
+      alertDiv.innerHTML = "<strong>Some enabled masternodes may still be running legacy versions.</strong><div>They may not follow the post-upgrade network correctly.</div>";
+    } else if (snapshot.masternode_upgraded_enabled > 0) {
+      alertDiv.className = "alert-item info";
+      alertDiv.innerHTML = "<strong>Enabled masternodes appear compatible with the post-upgrade network.</strong>";
+    } else {
+      alertDiv.className = "alert-item info";
+      alertDiv.innerHTML = "<strong>Masternode version classification is still checking.</strong><div>Enabled count is available, but version mapping is incomplete.</div>";
+    }
+    compatDiv.appendChild(alertDiv);
+  }
+
+  const body = byId("mn-version-breakdown");
+  body.innerHTML = "";
+  const versions = normalizeMasternodeVersions(snapshot.masternode_versions);
+  if (!versions.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = "<td colspan='3'>No masternode version data</td>";
+    body.appendChild(row);
+    return;
+  }
+  versions.forEach((entry) => {
+    const row = document.createElement("tr");
+    const tagClass = entry.is_upgraded === true ? "latest" : entry.is_upgraded === false ? "legacy" : "unknown";
+    const tagLabel = entry.is_upgraded === true ? "Latest" : entry.is_upgraded === false ? "Legacy" : "Checking";
+    row.innerHTML = `
+      <td>
+        <span class="version-chip">
+          <span>${entry.protocol_version ?? "unknown"}</span>
+          <span class="version-tag ${tagClass}">${tagLabel}</span>
+        </span>
+      </td>
+      <td>${entry.semver || "-"}</td>
+      <td>${formatNumber(entry.count)}</td>
+    `;
+    body.appendChild(row);
+  });
+}
+
+function renderPeerSummary(peers) {
+  const summary = peers.summary || {};
+  const items = peers.items || [];
+  const total = Number(summary.total_peers || summary.total || window.latestPeerCount || items.length || 0);
+  const upgraded = Number(summary.upgraded_peers || 0);
+  const legacy = Number(summary.legacy_peers || 0);
+  const unknown = Math.max(0, Number(summary.unknown_peers ?? (total - upgraded - legacy)) || 0);
+  const peerSummary = byId("peer-summary");
+  if (peerSummary) {
+    peerSummary.innerHTML = `
+      <div class="metric-grid">
+        <div class="metric"><span class="label">Total peers</span><strong>${formatNumber(total)}</strong></div>
+        <div class="metric"><span class="label">Upgraded</span><strong>${formatNumber(upgraded)}</strong></div>
+        <div class="metric"><span class="label">Legacy</span><strong>${formatNumber(legacy)}</strong></div>
+        <div class="metric"><span class="label">Unknown</span><strong>${formatNumber(unknown)}</strong></div>
+      </div>
+    `;
+  }
+
+  const list = byId("peer-versions");
+  if (!list) {
+    return;
+  }
+  list.innerHTML = "";
+  const versions = summary.versions || [];
+  if (!versions.length && items.length) {
+    const item = document.createElement("li");
+    item.className = "list-item";
+    item.textContent = `${items.length} peer records available; version summary is still checking.`;
+    list.appendChild(item);
+    return;
+  }
+  versions.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = "list-item";
+    item.textContent = `${entry.label}: ${entry.count}`;
+    list.appendChild(item);
+  });
+}
+
+function extractPriceValue(payload) {
+  if (payload === null || payload === undefined) {
+    return null;
+  }
+  if (typeof payload === "number") {
+    return payload;
+  }
+  if (typeof payload === "string") {
+    const value = Number(payload.replace(/[^0-9.eE-]/g, ""));
+    return Number.isFinite(value) ? value : null;
+  }
+  const keys = ["price", "last", "usd", "usdt", "price_usd", "price_usdt", "current_price"];
+  for (const key of keys) {
+    if (payload[key] !== undefined) {
+      const value = extractPriceValue(payload[key]);
+      if (value !== null) {
+        return value;
+      }
+    }
+  }
+  for (const value of Object.values(payload)) {
+    if (typeof value === "object" && value !== null) {
+      const nested = extractPriceValue(value);
+      if (nested !== null) {
+        return nested;
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchPepepowPrice() {
+  if (cachedPepepowPriceUsdt !== null || priceFetchInFlight) {
+    return;
+  }
+  priceFetchInFlight = true;
+  try {
+    const response = await fetch(`${window.location.origin}/ext/getcurrentprice`, { headers: { Accept: "application/json" } });
+    if (!response.ok) {
+      throw new Error(`price request failed: ${response.status}`);
+    }
+    const text = await response.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch (_) {
+      payload = text;
+    }
+    cachedPepepowPriceUsdt = extractPriceValue(payload);
+    renderMonthlyReward(latestRewardSnapshot);
+  } catch (error) {
+    console.warn("price fetch failed", error);
+  } finally {
+    priceFetchInFlight = false;
+  }
+}
+
+function renderMonthlyReward(snapshot) {
+  if (!snapshot) {
+    return;
+  }
+  const target = byId("reward-month-usdt");
+  if (!target) {
+    return;
+  }
+  const perDay = Number(snapshot.reward_estimate?.per_day || 0);
+  if (!perDay) {
+    target.textContent = "-";
+    return;
+  }
+  if (cachedPepepowPriceUsdt === null) {
+    target.textContent = "Loading price…";
+    return;
+  }
+  const monthlyCoin = perDay * 30;
+  const monthlyUsdt = monthlyCoin * cachedPepepowPriceUsdt;
+  target.textContent = `${monthlyUsdt.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`;
+}
+
 function renderFork(fork, snapshot = {}) {
   const currentHeight = fork.current_height ?? snapshot.height;
   const effectiveState = fork.state === "ERROR" && currentHeight ? "POST_FORK" : (fork.state || (currentHeight ? "POST_FORK" : "UNKNOWN"));
@@ -191,7 +402,6 @@ function renderFork(fork, snapshot = {}) {
   setText("fork-eta", formatDuration(fork.estimated_eta_seconds));
   setText("fork-hoohash-bit", fork.hoohash_bit ? `0x${Number(fork.hoohash_bit).toString(16)}` : "Legacy config not set");
   setText("fork-xelis-bit", fork.xelis_bit ? `0x${Number(fork.xelis_bit).toString(16)}` : "Legacy config not set");
-  setText("fork-blocks-after", fork.blocks_after_fork ? formatNumber(fork.blocks_after_fork) : "-");
   setText("fork-last-block-age", formatDuration(fork.last_block_age ?? snapshot.last_block_age));
 
   const t8m = snapshot.avg_block_time_8m;
@@ -269,3 +479,16 @@ function renderFork(fork, snapshot = {}) {
     });
   }
 }
+
+const baseRenderSnapshot = renderSnapshot;
+renderSnapshot = function tunedRenderSnapshot(snapshot) {
+  window.latestPeerCount = Number(snapshot.peer_count || 0);
+  if ((!snapshot.hashrate_display || snapshot.hashrate_display === "-") && snapshot.difficulty) {
+    snapshot = { ...snapshot, hashrate_display: estimateHashrateDisplay(snapshot) };
+  }
+  baseRenderSnapshot(snapshot);
+  setText("network-hashrate", estimateHashrateDisplay(snapshot));
+  latestRewardSnapshot = snapshot;
+  renderMonthlyReward(snapshot);
+  fetchPepepowPrice();
+};
