@@ -1,0 +1,16 @@
+[Unit]
+Description=PEPEPOW eIquidus Explorer Sync
+After=network.target mongod.service pepepow-explorer.service
+Wants=mongod.service pepepow-explorer.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/explorer
+Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.11.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/bin/bash /home/ubuntu/explorer/sync.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
