@@ -1,0 +1,67 @@
+.alert-history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.alert-history-details {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.alert-history-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.alert-list .alert-item {
+  padding: 10px 12px;
+}
+
+.alert-item.info {
+  background: rgba(119, 189, 251, 0.07);
+}
+
+.inline-panel-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.compact-heading {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+}
+
+.compact-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.lower-grid {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
+}
+
+.mining-pools-panel table {
+  min-width: 980px;
+}
+
+.mining-pools-panel .endpoint-column {
+  min-width: 320px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mining-pools-panel .error-column {
+  min-width: 220px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+@media (max-width: 1180px) {
+  .lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
