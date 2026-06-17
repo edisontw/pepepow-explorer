@@ -388,5 +388,5 @@ def load_settings() -> Settings:
         comparison_sources=comparison_sources,
         site_status_targets=site_status_targets,
         mining_pool_targets=mining_pool_targets,
-        stale_after_seconds=max(poll_interval * 3, 15),
+        stale_after_seconds=max(poll_interval * 12, 120),
     )
