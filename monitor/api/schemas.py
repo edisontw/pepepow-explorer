@@ -144,6 +144,15 @@ class MasternodesPayloadModel(BaseModel):
     items: list[MasternodeItemModel] = Field(default_factory=list)
 
 
+class RewardEstimateModel(BaseModel):
+    block_reward: float | None = None
+    enabled_masternodes: int = 0
+    per_20s: float | None = None
+    per_hour: float | None = None
+    per_day: float | None = None
+    formula: str = "block_reward * 0.95 * 0.35 / enabled_masternodes"
+
+
 class StatusModel(BaseModel):
     generated_at: str | None = None
     generated_at_unix: int | None = None
@@ -190,6 +199,7 @@ class StatusModel(BaseModel):
     freshness: FreshnessModel = Field(default_factory=FreshnessModel)
     upgrade_summary: UpgradeSummaryModel = Field(default_factory=UpgradeSummaryModel)
     recent_anomalies: RecentAnomaliesModel = Field(default_factory=RecentAnomaliesModel)
+    reward_estimate: RewardEstimateModel = Field(default_factory=RewardEstimateModel)
 
 
 class HealthModel(BaseModel):

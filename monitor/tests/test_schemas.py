@@ -87,6 +87,14 @@ class SchemaTests(unittest.TestCase):
             },
             upgrade_summary={"enabled": 5, "upgraded": 4, "legacy": 1, "unknown": 0, "ratio": 0.8, "classification_status": "complete"},
             recent_anomalies={"window_hours": 24, "raised_count": 2, "cleared_count": 1, "active_critical_count": 1, "latest": []},
+            reward_estimate={
+                "block_reward": 50.0,
+                "enabled_masternodes": 5,
+                "per_20s": 3.325,
+                "per_hour": 598.5,
+                "per_day": 14364.0,
+                "formula": "block_reward * 0.95 * 0.35 / enabled_masternodes"
+            },
         )
         self.assertEqual(model.masternode_enabled, 5)
         self.assertEqual(model.avg_block_time_5m, 61.0)
@@ -98,6 +106,10 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(model.freshness.status, "stale")
         self.assertEqual(model.freshness.mn_cache_age_seconds, 10)
         self.assertEqual(model.freshness.site_status_status, "stale")
+        self.assertEqual(model.reward_estimate.block_reward, 50.0)
+        self.assertEqual(model.reward_estimate.per_20s, 3.325)
+        self.assertEqual(model.reward_estimate.per_hour, 598.5)
+        self.assertEqual(model.reward_estimate.per_day, 14364.0)
 
     def test_masternodes_payload_model_accepts_cached_list(self):
         model = MasternodesPayloadModel(

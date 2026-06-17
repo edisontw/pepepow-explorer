@@ -196,6 +196,7 @@ class Settings:
     difficulty_anomaly_ratio: float = 3.0
     interval_low_ratio: float = 0.5
     interval_high_ratio: float = 2.5
+    monitor_block_reward: float | None = None
 
     @property
     def fork_configured(self) -> bool:
@@ -283,6 +284,7 @@ def load_settings() -> Settings:
         MiningPoolTarget(host="eu.mining4people.com", port=4176, name="(M4P) eu.mining4people.com:4176"),
         MiningPoolTarget(host="us-west.mining4people.com", port=4176, name="(M4P) us-west.mining4people.com:4176"),
         MiningPoolTarget(host="stratum-eu.pepepow.foztor.net", port=13232, name="(foztor) stratum-eu.pepepow.foztor.net:13232"),
+        MiningPoolTarget(host="pool.pepepow.net", port=39333, name="Lab — pool.pepepow.net:39333"),
     ]
     mining_pools_raw = os.getenv("MONITOR_MINING_POOL_TARGETS")
     if mining_pools_raw:
@@ -327,8 +329,17 @@ def load_settings() -> Settings:
     ) or 60
     target_version = os.getenv("MONITOR_MIN_UPGRADED_SUBVER", "2.9.0.2")
 
+    block_reward_val = os.getenv("MONITOR_BLOCK_REWARD")
+    monitor_block_reward = None
+    if block_reward_val:
+        try:
+            monitor_block_reward = float(block_reward_val)
+        except ValueError:
+            pass
+
     return Settings(
         repo_root=repo_root,
+        monitor_block_reward=monitor_block_reward,
         title=os.getenv("MONITOR_TITLE", "PEPEPOW Network Monitor"),
         root_path=os.getenv("MONITOR_ROOT_PATH", "/monitor"),
         rpc_url=rpc_url,

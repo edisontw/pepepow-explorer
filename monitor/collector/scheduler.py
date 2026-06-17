@@ -434,7 +434,27 @@ class MonitorCollector:
             site_checks_generated_at_unix=site_checks_generated_at_unix,
         )
 
+        block_reward = self.settings.monitor_block_reward
+        enabled_masternodes = masternode_summary.get("enabled", 0)
+        per_20s = None
+        per_hour = None
+        per_day = None
+        if block_reward is not None and enabled_masternodes > 0:
+            per_20s = (block_reward * 0.95 * 0.35) / enabled_masternodes
+            per_hour = per_20s * 180
+            per_day = per_20s * 4320
+
+        reward_estimate = {
+            "block_reward": block_reward,
+            "enabled_masternodes": enabled_masternodes,
+            "per_20s": per_20s,
+            "per_hour": per_hour,
+            "per_day": per_day,
+            "formula": "block_reward * 0.95 * 0.35 / enabled_masternodes"
+        }
+
         snapshot = {
+            "reward_estimate": reward_estimate,
             "generated_at": generated_at,
             "generated_at_unix": generated_at_unix,
             "stale": False,
@@ -1500,6 +1520,14 @@ class MonitorCollector:
                 "invalid_version_blocks": [],
             },
             "alerts": [],
+            "reward_estimate": {
+                "block_reward": None,
+                "enabled_masternodes": 0,
+                "per_20s": None,
+                "per_hour": None,
+                "per_day": None,
+                "formula": "block_reward * 0.95 * 0.35 / enabled_masternodes"
+            },
             "recent_blocks": [],
             "recent_hashrate": [],
             "recent_block_intervals": [],

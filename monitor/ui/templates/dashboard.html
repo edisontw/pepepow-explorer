@@ -207,6 +207,41 @@
             <ul id="fork-reasons" class="simple-list compact-list" style="margin-top: 0.8rem;"></ul>
           </details>
         </article>
+
+        <article class="panel" id="reward-estimate-panel">
+          <div class="panel-heading">
+            <h2>Masternode Rewards</h2>
+            <span class="panel-kicker">Estimated Earnings</span>
+          </div>
+          <div id="reward-configured-container">
+            <div class="metric-grid">
+              <div class="metric">
+                <span class="label">Per 20 Seconds</span>
+                <strong id="reward-20s">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Per Hour</span>
+                <strong id="reward-hour">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Per Day</span>
+                <strong id="reward-day">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Block Reward</span>
+                <strong id="reward-block-reward">-</strong>
+              </div>
+            </div>
+            <p class="panel-kicker" style="margin-top: 1rem; font-size: 0.76rem; margin-bottom: 0;">
+              Formula: block_reward × 0.95 × 0.35 / enabled_masternodes
+            </p>
+          </div>
+          <div id="reward-unconfigured-container" class="hidden">
+            <p style="color: var(--warning); margin: 1rem 0 0; font-size: 0.9rem;">
+              Set MONITOR_BLOCK_REWARD to enable reward estimate
+            </p>
+          </div>
+        </article>
       </section>
 
       <section class="panel-grid">

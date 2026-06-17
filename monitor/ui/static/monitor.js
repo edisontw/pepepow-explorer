@@ -711,6 +711,26 @@ function renderSnapshot(snapshot) {
     lastSectionKeys.comparison = comparisonKey;
   }
 
+  const reward = snapshot.reward_estimate;
+  if (reward && reward.block_reward !== null) {
+    byId("reward-configured-container").classList.remove("hidden");
+    byId("reward-unconfigured-container").classList.add("hidden");
+    if (reward.per_20s !== null) {
+      setText("reward-20s", formatFloat(reward.per_20s, 6, " PEPEW"));
+      setText("reward-hour", formatFloat(reward.per_hour, 6, " PEPEW"));
+      setText("reward-day", formatFloat(reward.per_day, 6, " PEPEW"));
+      setText("reward-block-reward", formatFloat(reward.block_reward, 2, " PEPEW"));
+    } else {
+      setText("reward-20s", "N/A");
+      setText("reward-hour", "N/A");
+      setText("reward-day", "N/A");
+      setText("reward-block-reward", formatFloat(reward.block_reward, 2, " PEPEW"));
+    }
+  } else {
+    byId("reward-configured-container").classList.add("hidden");
+    byId("reward-unconfigured-container").classList.remove("hidden");
+  }
+
   renderCharts(snapshot);
 
   byId("stale-indicator").classList.toggle("hidden", !snapshot.stale);

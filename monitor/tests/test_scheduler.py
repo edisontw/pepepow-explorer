@@ -595,6 +595,30 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first_fingerprint, second_snapshot.get("_masternode_summary_fingerprint"))
         self.assertEqual(first_snapshot["upgrade_summary"], second_snapshot["upgrade_summary"])
 
+    async def test_reward_estimate_not_calculated_when_unconfigured(self):
+        settings = build_settings()
+        settings.monitor_block_reward = None
+        collector = MonitorCollector(settings, MemoryCache(), SpySources(), logger=logging.getLogger("test"))
+
+        await collector.refresh_once()
+        snapshot = collector.get_status_payload()
+        self.assertIsNone(snapshot["reward_estimate"]["block_reward"])
+        self.assertIsNone(snapshot["reward_estimate"]["per_20s"])
+
+    async def test_reward_estimate_calculated_when_configured(self):
+        settings = build_settings()
+        settings.monitor_block_reward = 50.0
+        collector = MonitorCollector(settings, MemoryCache(), SpySources(), logger=logging.getLogger("test"))
+
+        await collector.refresh_once()
+        snapshot = collector.get_status_payload()
+        self.assertEqual(snapshot["reward_estimate"]["block_reward"], 50.0)
+        self.assertEqual(snapshot["reward_estimate"]["enabled_masternodes"], 1)
+        self.assertEqual(snapshot["reward_estimate"]["per_20s"], 16.625)
+        self.assertEqual(snapshot["reward_estimate"]["per_hour"], 2992.5)
+        self.assertEqual(snapshot["reward_estimate"]["per_day"], 71820.0)
+
+
 
 if __name__ == "__main__":
     unittest.main()
