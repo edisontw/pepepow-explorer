@@ -36,8 +36,10 @@ def build_alert(
 
 
 def determine_fork_state(current_height: int | None, fork_height: int | None) -> str:
-    if current_height is None or fork_height is None:
+    if current_height is None:
         return "ERROR"
+    if fork_height is None:
+        return "POST_FORK"
     if current_height < fork_height:
         return "PRE_FORK"
     if current_height == fork_height:
@@ -64,16 +66,8 @@ def evaluate_fork_state(
     activation_seen = bool(activation_blocks)
 
     alerts: list[dict[str, Any]] = []
-    if not fork_configured:
-        alerts.append(
-            build_alert(
-                "fork_config_error",
-                "critical",
-                "Fork configuration missing",
-                "MONITOR_FORK_HEIGHT, MONITOR_HOOHASH_BIT, MONITOR_XELIS_BIT, and MONITOR_MIN_UPGRADED_SUBVER must be set.",
-                source="monitor",
-            )
-        )
+    # The fork is long past activation for the public monitor. Missing legacy fork
+    # parameters should not dominate the live health view as a critical alert.
 
     for block in suspicious_blocks:
         alerts.append(
@@ -89,9 +83,9 @@ def evaluate_fork_state(
 
     if last_block_age is None:
         chain_moving_status = "unknown"
-    elif last_block_age <= block_target_seconds * 1.5:
-        chain_moving_status = "healthy"
     elif last_block_age <= block_target_seconds * 3:
+        chain_moving_status = "healthy"
+    elif last_block_age <= block_target_seconds * 8:
         chain_moving_status = "slow"
     else:
         chain_moving_status = "stalled"
@@ -132,6 +126,8 @@ def evaluate_fork_state(
 
 def _evaluate_fork_readiness(state: str, countdown_blocks: int | None) -> tuple[str, list[str]]:
     if countdown_blocks is None:
+        if state == "POST_FORK":
+            return "normal", ["Network is already post-upgrade; legacy fork countdown is no longer relevant."]
         return "normal", []
 
     reasons: list[str] = []
@@ -146,7 +142,7 @@ def _evaluate_fork_readiness(state: str, countdown_blocks: int | None) -> tuple[
         reasons.append("Fork activation window is active.")
         return "critical", reasons
     elif state == "POST_FORK":
-        reasons.append("Hoohash hard fork completed successfully.")
+        reasons.append("Hoohash upgrade is active on the monitored chain.")
         return "normal", reasons
 
     return "normal", reasons
@@ -167,9 +163,9 @@ def _evaluate_fork_stall_level(
     if not in_alert_window:
         return "normal"
 
-    if last_block_age > block_target_seconds * 4:
+    if last_block_age > block_target_seconds * 12:
         return "critical"
-    if last_block_age > block_target_seconds * 2:
+    if last_block_age > block_target_seconds * 8:
         return "warning"
     return "normal"
 
@@ -186,25 +182,25 @@ def detect_no_new_block_alert(
     latest_time = int(latest_block["time"])
     now = current_timestamp or int(time.time())
     age = now - latest_time
-    
-    if age > block_target_seconds * 3:
+
+    if age > block_target_seconds * 12:
         return [
             build_alert(
                 "stalled_blocks",
                 "critical",
-                "No new block",
+                "No recent block",
                 f"No new block has been seen for {age} seconds.",
                 source="rpc_local",
                 details={"age_seconds": age},
             )
         ]
-    if age > block_target_seconds * 1.5:
+    if age > block_target_seconds * 5:
         return [
             build_alert(
                 "slow_blocks",
                 "warning",
-                "Last block age higher than normal",
-                f"Last block age is {age} seconds, which is higher than normal.",
+                "Last block age elevated",
+                f"Last block age is {age} seconds. This can happen during normal PEPEPOW RPC lag; monitor for persistence.",
                 source="rpc_local",
                 details={"age_seconds": age},
             )
@@ -237,13 +233,13 @@ def detect_rpc_health_alert(
     rpc_local_status: str,
     cooldown_active_seconds: int,
 ) -> list[dict[str, Any]]:
-    if rpc_local_status != "cooldown" or cooldown_active_seconds <= 120:
+    if rpc_local_status != "cooldown" or cooldown_active_seconds <= 300:
         return []
     return [
         build_alert(
             "rpc_cooldown_too_long",
-            "critical",
-            "RPC cooldown active too long",
+            "warning",
+            "RPC cooldown active",
             f"Local RPC has remained in cooldown for {cooldown_active_seconds} seconds.",
             source="rpc_local",
             details={"cooldown_active_seconds": cooldown_active_seconds},
@@ -309,8 +305,8 @@ def detect_fork_stall_alert(fork_status: dict[str, Any]) -> list[dict[str, Any]]
         build_alert(
             "fork_stall",
             level,
-            "Chain may be stalled near fork",
-            f"Last block age is {last_block_age} seconds during the fork-sensitive window.",
+            "Chain may be stalled",
+            f"Last block age is {last_block_age} seconds. This threshold is relaxed for normal PEPEPOW RPC lag.",
             source="rpc_local",
             details={
                 "last_block_age": last_block_age,
@@ -321,59 +317,67 @@ def detect_fork_stall_alert(fork_status: dict[str, Any]) -> list[dict[str, Any]]
     ]
 
 
+def detect_mempool_zero_alert(mempool_txs: int | None, recent_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if mempool_txs != 0 or len(recent_blocks) < 5:
+        return []
+    return [
+        build_alert(
+            "mempool_zero_recent",
+            "warning",
+            "Mempool empty while blocks continue",
+            "The mempool is empty even though recent blocks are being produced.",
+            source="public_api_remote",
+            details={"recent_blocks": len(recent_blocks)},
+        )
+    ]
+
+
 def detect_site_health_alerts(public_sites: list[dict[str, Any]]) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     for site in public_sites:
+        status = site.get("status")
         failures = int(site.get("consecutive_failures", 0) or 0)
-        status_code = site.get("status_code")
-        if failures < SITE_FAILURE_ALERT_THRESHOLD:
-            continue
-        if site.get("status") == "ok" and (status_code is None or int(status_code) < 500):
-            continue
-        alerts.append(
-            build_alert(
-                "public_site_degraded",
-                "warning",
-                "Public site degraded",
-                f"{site.get('name')} has failed {failures} consecutive checks.",
-                source=str(site.get("name") or "site"),
-                details={
-                    "status_code": status_code,
-                    "consecutive_failures": failures,
-                    "id_suffix": str(site.get("name") or site.get("url") or "site"),
-                },
+        if status == "down" and failures >= SITE_FAILURE_ALERT_THRESHOLD:
+            alerts.append(
+                build_alert(
+                    "public_site_down",
+                    "warning",
+                    "Public service unavailable",
+                    f"{site.get('name') or site.get('url')} has failed {failures} consecutive checks.",
+                    source="site_status",
+                    details={"id_suffix": str(site.get("name") or site.get("url")), "failures": failures},
+                )
             )
-        )
     return alerts
 
 
 def detect_source_degraded_alert(source_health: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    degraded = [
-        entry["name"]
-        for entry in source_health.values()
-        if entry.get("name") != "rpc_local" and entry.get("status") in {"degraded", "down"}
-    ]
-    if not degraded:
-        return []
-    joined = ", ".join(sorted(degraded))
-    return [
-        build_alert(
-            "source_degraded",
-            "warning",
-            "Source degraded",
-            f"Fallback source degradation detected: {joined}.",
-            source="monitor",
-            details={"sources": degraded},
-        )
-    ]
+    alerts: list[dict[str, Any]] = []
+    for name, status in source_health.items():
+        if status.get("status") in {"down", "cooldown"}:
+            alerts.append(
+                build_alert(
+                    "source_down",
+                    "warning",
+                    "Data source unavailable",
+                    f"{name} is {status.get('status')}: {status.get('last_error') or 'no recent successful check'}.",
+                    source=name,
+                    details={"id_suffix": name},
+                )
+            )
+    return alerts
 
 
 def sort_alerts(alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(
-        alerts,
-        key=lambda item: (SEVERITY_ORDER.get(item["severity"], 9), item["title"], item["id"]),
-    )
+    return sorted(alerts, key=lambda item: (SEVERITY_ORDER.get(item.get("severity"), 99), item.get("type", "")))
 
 
-def summarize_peers(peers: list[dict[str, Any]], minimum_subver: str | None) -> dict[str, Any]:
-    return build_peer_version_summary(peers, minimum_subver)
+def summarize_peers(peerinfo: list[dict[str, Any]], min_upgraded_subver: str | None) -> dict[str, Any]:
+    versions = build_peer_version_summary(peerinfo, min_upgraded_subver)
+    return {
+        "total_peers": len(peerinfo),
+        "upgraded_peers": sum(item["count"] for item in versions if item["is_upgraded"] is True),
+        "legacy_peers": sum(item["count"] for item in versions if item["is_upgraded"] is False),
+        "unknown_peers": sum(item["count"] for item in versions if item["is_upgraded"] is None),
+        "versions": versions,
+    }
