@@ -31,7 +31,48 @@ node_modules
 settings.json
 .idea
 *~
+monitor/.env
+monitor/.venv/
+monitor/__pycache__/
+monitor/**/*.pyc
 
 .DS_Store
 
 package-lock.json
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python local runtime
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime data
+*.log
+*.pid
+*.sock
+*.sqlite
+*.sqlite3
+*.db
+dump.rdb
+
+# Keys / certs
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Local backups
+*.bak
+*.bk
+*.bak-*
+*.old
+

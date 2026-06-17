@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ root_path }}/static/monitor.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script src="{{ root_path }}/static/monitor.js" defer></script>
+  </head>
+  <body data-root-path="{{ root_path }}">
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">PEPEPOW /monitor</p>
+          <h1>PEPEPOW Post-Fork Network Monitor</h1>
+          <p class="subtitle">Chain health first. Node consistency, mining stability, and service availability after the Hoohash upgrade.</p>
+          <p class="hero-link">
+            <a href="https://github.com/MattF42/PePe-core/" target="_blank" rel="noopener noreferrer">
+              Core source: MattF42/PePe-core
+            </a>
+          </p>
+        </div>
+        <div class="hero-meta">
+          <span class="meta-label">Last snapshot</span>
+          <span id="generated-at">Waiting for first snapshot</span>
+          <span id="generated-at-relative" class="meta-relative">-</span>
+          <span id="stale-indicator" class="pill pill-warning hidden">Stale data</span>
+        </div>
+      </header>
+
+      <section class="panel-grid top-grid">
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Network Status</h2>
+            <span class="panel-kicker">Live metrics</span>
+          </div>
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="label">Height</span>
+              <strong id="network-height">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Avg block time (8m)</span>
+              <strong id="network-avg-block-8m">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Last block age</span>
+              <strong id="network-last-block-age">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Data freshness</span>
+              <strong id="network-freshness">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Difficulty</span>
+              <strong id="network-difficulty">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Hashrate</span>
+              <strong id="network-hashrate">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Upgrade summary</span>
+              <strong id="network-upgrade-summary">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Services</span>
+              <strong id="network-services-status">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Mempool txs</span>
+              <strong id="network-mempool-size">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">RPC status</span>
+              <strong id="network-rpc-status">-</strong>
+            </div>
+          </div>
+          <div id="freshness-summary" class="stack compact-stack"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Masternode Status</h2>
+            <span class="panel-kicker">Primary readiness signal</span>
+          </div>
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="label">Enabled</span>
+              <strong id="mn-enabled">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Total</span>
+              <strong id="mn-total">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Compatible enabled</span>
+              <strong id="mn-upgraded">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Legacy enabled</span>
+              <strong id="mn-legacy">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Compatible ratio</span>
+              <strong id="mn-upgrade-ratio">-</strong>
+            </div>
+          </div>
+          <div id="mn-compatibility-summary" class="stack compact-stack" style="margin-top: 1rem;"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Semver</th>
+                  <th>Enabled nodes</th>
+                </tr>
+              </thead>
+              <tbody id="mn-version-breakdown"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Hoohash Network Health</h2>
+            <span class="panel-kicker">Post-fork stability tracking</span>
+          </div>
+          <div class="fork-hero">
+            <div>
+              <span class="label">State</span>
+              <strong id="fork-state" class="status-badge">-</strong>
+            </div>
+            <div>
+              <span class="label">Chain Movement</span>
+              <strong id="fork-moving-status" class="status-badge">-</strong>
+            </div>
+          </div>
+          <div class="metric-grid fork-grid">
+            <div class="metric">
+              <span class="label">Fork height</span>
+              <strong id="fork-height">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Current height</span>
+              <strong id="fork-current-height">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Blocks after fork</span>
+              <strong id="fork-blocks-after">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Last block age</span>
+              <strong id="fork-last-block-age">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Avg block time (8m)</span>
+              <strong id="fork-avg-block-8m">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Avg block time (30m)</span>
+              <strong id="fork-avg-block-30m">-</strong>
+            </div>
+            <div class="metric">
+              <span class="label">Avg block time (2h)</span>
+              <strong id="fork-avg-block-2h">-</strong>
+            </div>
+          </div>
+
+          <details class="raw-snapshot-details" style="margin-top: 1.2rem; border-top: 1px solid var(--border); padding-top: 0.8rem;">
+            <summary class="panel-kicker" style="cursor: pointer; user-select: none;">Raw Pre-Fork Snapshot Details</summary>
+            <div class="metric-grid fork-grid" style="margin-top: 0.8rem;">
+              <div class="metric">
+                <span class="label">Blocks remaining</span>
+                <strong id="fork-countdown">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Readiness</span>
+                <strong id="fork-readiness" class="status-badge">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Chain stall</span>
+                <strong id="fork-stall" class="status-badge">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Activation seen</span>
+                <strong id="fork-activation">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Estimated ETA</span>
+                <strong id="fork-eta">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Hoohash bit</span>
+                <strong id="fork-hoohash-bit">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Xelis bit</span>
+                <strong id="fork-xelis-bit">-</strong>
+              </div>
+              <div class="metric">
+                <span class="label">Upgrade ratio</span>
+                <strong id="fork-upgrade">-</strong>
+              </div>
+            </div>
+            <ul id="fork-reasons" class="simple-list compact-list" style="margin-top: 0.8rem;"></ul>
+          </details>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel wide-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>My Nodes <span class="panel-kicker">(stored only on your own device locally)</span></h2>
+              <span class="panel-kicker">Client-side filter over cached masternode list</span>
+            </div>
+            <span id="my-nodes-list-generated-at" class="panel-kicker">Last MN sync: unavailable</span>
+          </div>
+          <div class="my-nodes-form">
+            <input
+              id="my-nodes-key"
+              class="my-nodes-input"
+              type="text"
+              placeholder="Collateral address preferred, txid or ip also accepted"
+            />
+            <input
+              id="my-nodes-label"
+              class="my-nodes-input my-nodes-label-input"
+              type="text"
+              placeholder="Optional label"
+            />
+            <button id="my-nodes-add" class="my-nodes-add-button" type="button">+</button>
+          </div>
+          <div id="my-nodes-message" class="my-nodes-message" aria-live="polite"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Status</th>
+                  <th>Last Seen</th>
+                  <th>Version</th>
+                  <th>Height</th>
+                  <th>Compatible</th>
+                  <th>IP</th>
+                  <th>Remove</th>
+                </tr>
+              </thead>
+              <tbody id="my-nodes-table-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel-grid chart-grid">
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Hashrate Over Time</h2>
+          </div>
+          <canvas id="hashrate-chart"></canvas>
+        </article>
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Block Interval</h2>
+          </div>
+          <canvas id="interval-chart"></canvas>
+        </article>
+      </section>
+
+      <section class="panel-grid lower-grid">
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Alerts</h2>
+          </div>
+          <div id="anomaly-summary" class="stack compact-stack"></div>
+          <ul id="alerts-list" class="alert-list"></ul>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Services</h2>
+          </div>
+          <div id="services-summary" class="stack compact-stack"></div>
+          <ul id="source-health" class="simple-list"></ul>
+          <div class="table-wrap top-space">
+            <table>
+              <thead>
+                <tr>
+                  <th>Public site</th>
+                  <th>Status</th>
+                  <th>HTTP</th>
+                  <th>Latency</th>
+                  <th>Last checked</th>
+                </tr>
+              </thead>
+              <tbody id="public-sites"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel wide-panel">
+          <div class="panel-heading">
+            <h2>Mining Pools</h2>
+            <span class="panel-kicker">Scheduler-driven short-lived stratum probes</span>
+          </div>
+          <div id="mining-pool-summary" class="stack compact-stack"></div>
+          <div class="table-wrap top-space">
+            <table>
+              <thead>
+                <tr>
+                  <th>Endpoint</th>
+                  <th>Status</th>
+                  <th>Latency</th>
+                  <th>Last OK</th>
+                  <th>Last checked</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody id="mining-pools"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel wide-panel">
+          <div class="panel-heading">
+            <h2>Recent Blocks</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Height</th>
+                  <th>Hash</th>
+                  <th>Version</th>
+                  <th>Algo</th>
+                  <th>Interval</th>
+                  <th>Difficulty</th>
+                  <th>Age</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="recent-blocks"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel wide-panel">
+          <div class="panel-heading">
+            <h2>Comparison Nodes</h2>
+          </div>
+          <div id="comparison-summary" class="stack compact-stack" style="margin-bottom: 1rem;"></div>
+          <ul id="comparison-results" class="simple-list"></ul>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel wide-panel">
+          <div class="panel-heading">
+            <h2>Peer Snapshot</h2>
+            <span class="panel-kicker">Secondary signal</span>
+          </div>
+          <div id="peer-summary" class="stack"></div>
+          <ul id="peer-versions" class="simple-list"></ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

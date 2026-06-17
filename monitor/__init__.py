@@ -1,0 +1,1 @@
+"""PEPEPOW monitor sidecar package."""
