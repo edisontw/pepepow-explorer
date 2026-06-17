@@ -1,9 +1,5 @@
 // Calmer public monitor presentation overrides. Loaded after monitor.js.
 
-let cachedPepepowPriceUsdt = null;
-let priceFetchInFlight = false;
-let latestRewardSnapshot = null;
-
 function alertPresentation(alert) {
   const type = alert?.type || "";
   if (type === "fork_config_error") {
@@ -311,83 +307,22 @@ function renderPeerSummary(peers) {
   });
 }
 
-function extractPriceValue(payload) {
-  if (payload === null || payload === undefined) {
-    return null;
-  }
-  if (typeof payload === "number") {
-    return payload;
-  }
-  if (typeof payload === "string") {
-    const value = Number(payload.replace(/[^0-9.eE-]/g, ""));
-    return Number.isFinite(value) ? value : null;
-  }
-  const keys = ["price", "last", "usd", "usdt", "price_usd", "price_usdt", "current_price"];
-  for (const key of keys) {
-    if (payload[key] !== undefined) {
-      const value = extractPriceValue(payload[key]);
-      if (value !== null) {
-        return value;
-      }
-    }
-  }
-  for (const value of Object.values(payload)) {
-    if (typeof value === "object" && value !== null) {
-      const nested = extractPriceValue(value);
-      if (nested !== null) {
-        return nested;
-      }
-    }
-  }
-  return null;
-}
-
-async function fetchPepepowPrice() {
-  if (cachedPepepowPriceUsdt !== null || priceFetchInFlight) {
-    return;
-  }
-  priceFetchInFlight = true;
-  try {
-    const response = await fetch(`${window.location.origin}/ext/getcurrentprice`, { headers: { Accept: "application/json" } });
-    if (!response.ok) {
-      throw new Error(`price request failed: ${response.status}`);
-    }
-    const text = await response.text();
-    let payload;
-    try {
-      payload = JSON.parse(text);
-    } catch (_) {
-      payload = text;
-    }
-    cachedPepepowPriceUsdt = extractPriceValue(payload);
-    renderMonthlyReward(latestRewardSnapshot);
-  } catch (error) {
-    console.warn("price fetch failed", error);
-  } finally {
-    priceFetchInFlight = false;
-  }
-}
-
 function renderMonthlyReward(snapshot) {
-  if (!snapshot) {
-    return;
-  }
   const target = byId("reward-month-usdt");
   if (!target) {
     return;
   }
-  const perDay = Number(snapshot.reward_estimate?.per_day || 0);
-  if (!perDay) {
-    target.textContent = "-";
+  const reward = snapshot?.reward_estimate || {};
+  const monthlyUsdt = Number(reward.per_month_usdt);
+  if (Number.isFinite(monthlyUsdt) && monthlyUsdt > 0) {
+    target.textContent = `${monthlyUsdt.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`;
     return;
   }
-  if (cachedPepepowPriceUsdt === null) {
-    target.textContent = "Loading price…";
+  if (reward.price_usdt === null || reward.price_usdt === undefined) {
+    target.textContent = "Price unavailable";
     return;
   }
-  const monthlyCoin = perDay * 30;
-  const monthlyUsdt = monthlyCoin * cachedPepepowPriceUsdt;
-  target.textContent = `${monthlyUsdt.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`;
+  target.textContent = "-";
 }
 
 function renderFork(fork, snapshot = {}) {
@@ -488,7 +423,5 @@ renderSnapshot = function tunedRenderSnapshot(snapshot) {
   }
   baseRenderSnapshot(snapshot);
   setText("network-hashrate", estimateHashrateDisplay(snapshot));
-  latestRewardSnapshot = snapshot;
   renderMonthlyReward(snapshot);
-  fetchPepepowPrice();
 };
