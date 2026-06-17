@@ -1,5 +1,7 @@
 // Calmer public monitor presentation overrides. Loaded after monitor.js.
 
+const tunedHashrateHistoryKey = "monitorFallbackHashrateHistory";
+
 function alertPresentation(alert) {
   const type = alert?.type || "";
   if (type === "fork_config_error") {
@@ -179,16 +181,25 @@ function renderStatusBanner(snapshot) {
   metaEl.textContent = metaParts.join("  ·  ");
 }
 
-function estimateHashrateDisplay(snapshot) {
-  if (snapshot.hashrate_display && snapshot.hashrate_display !== "-") {
-    return snapshot.hashrate_display;
+function estimateHashrateHps(snapshot) {
+  const direct = Number(snapshot.hashrate_hps);
+  if (Number.isFinite(direct) && direct > 0) {
+    return direct;
   }
   const difficulty = Number(snapshot.difficulty);
   const blockTime = Number(snapshot.avg_block_time_8m || snapshot.avg_block_time_30m || snapshot.avg_block_time_2h || 0);
   if (!Number.isFinite(difficulty) || difficulty <= 0 || !Number.isFinite(blockTime) || blockTime <= 0) {
-    return "-";
+    return null;
   }
-  return formatHashrateValue((difficulty * 4294967296) / blockTime);
+  return (difficulty * 4294967296) / blockTime;
+}
+
+function estimateHashrateDisplay(snapshot) {
+  if (snapshot.hashrate_display && snapshot.hashrate_display !== "-") {
+    return snapshot.hashrate_display;
+  }
+  const estimate = estimateHashrateHps(snapshot);
+  return estimate ? formatHashrateValue(estimate) : "-";
 }
 
 function formatHashrateValue(value) {
@@ -200,6 +211,77 @@ function formatHashrateValue(value) {
     index += 1;
   }
   return `${amount.toFixed(4)} ${units[index]}`;
+}
+
+function readFallbackHashrateHistory() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(tunedHashrateHistoryKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeFallbackHashrateHistory(history) {
+  try {
+    window.localStorage.setItem(tunedHashrateHistoryKey, JSON.stringify(history.slice(-60)));
+  } catch (_) {
+    // Ignore storage failures; chart can still render from the current point.
+  }
+}
+
+function buildHashrateSeries(snapshot) {
+  const serverSeries = Array.isArray(snapshot.recent_hashrate) ? snapshot.recent_hashrate.filter((point) => Number(point?.value) > 0) : [];
+  if (serverSeries.length >= 2) {
+    return serverSeries;
+  }
+
+  const estimate = estimateHashrateHps(snapshot);
+  if (!estimate || !snapshot.height) {
+    return serverSeries;
+  }
+
+  const history = readFallbackHashrateHistory();
+  const point = {
+    height: snapshot.height,
+    timestamp: snapshot.generated_at || new Date().toISOString(),
+    value: Number(estimate.toFixed(4)),
+  };
+  const last = history[history.length - 1];
+  if (!last || last.height !== point.height || Math.abs(Number(last.value) - point.value) > 0.0001) {
+    history.push(point);
+  }
+  const clean = history.filter((item) => Number(item?.height) && Number(item?.value) > 0).slice(-60);
+  writeFallbackHashrateHistory(clean);
+
+  if (clean.length === 1) {
+    return [
+      { ...clean[0], height: `${clean[0].height} -` },
+      { ...clean[0], height: String(clean[0].height) },
+    ];
+  }
+  return clean;
+}
+
+function renderCharts(snapshot) {
+  ensureCharts();
+  const hashrateSeries = buildHashrateSeries(snapshot);
+  const hashrateKey = buildSignature(hashrateSeries);
+  if (hashrateKey !== lastChartKeys.hashrate) {
+    hashrateChart.data.labels = hashrateSeries.map((point) => point.height);
+    hashrateChart.data.datasets[0].data = hashrateSeries.map((point) => point.value);
+    hashrateChart.update();
+    lastChartKeys.hashrate = hashrateKey;
+  }
+
+  const intervals = snapshot.recent_block_intervals || [];
+  const intervalKey = buildSignature(intervals);
+  if (intervalKey !== lastChartKeys.interval) {
+    intervalChart.data.labels = intervals.map((point) => point.height);
+    intervalChart.data.datasets[0].data = intervals.map((point) => point.value);
+    intervalChart.update();
+    lastChartKeys.interval = intervalKey;
+  }
 }
 
 function compatibleEnabledDisplay(snapshot) {
@@ -281,7 +363,7 @@ function renderPeerSummary(peers) {
         <div class="metric"><span class="label">Total peers</span><strong>${formatNumber(total)}</strong></div>
         <div class="metric"><span class="label">Upgraded</span><strong>${formatNumber(upgraded)}</strong></div>
         <div class="metric"><span class="label">Legacy</span><strong>${formatNumber(legacy)}</strong></div>
-        <div class="metric"><span class="label">Unknown</span><strong>${formatNumber(unknown)}</strong></div>
+        <div class="metric"><span class="label">Unknown</span><strong>${formatNumber(unknown || total)}</strong></div>
       </div>
     `;
   }
@@ -292,10 +374,12 @@ function renderPeerSummary(peers) {
   }
   list.innerHTML = "";
   const versions = summary.versions || [];
-  if (!versions.length && items.length) {
+  if (!versions.length) {
     const item = document.createElement("li");
     item.className = "list-item";
-    item.textContent = `${items.length} peer records available; version summary is still checking.`;
+    item.textContent = total > 0
+      ? `${formatNumber(total)} peer records available; version summary is still checking.`
+      : "Peer RPC snapshot has no version records yet. The next monitor refresh will retry.";
     list.appendChild(item);
     return;
   }
