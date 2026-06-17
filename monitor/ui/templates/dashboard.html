@@ -154,13 +154,17 @@
                   <strong id="reward-day">-</strong>
                 </div>
                 <div class="metric">
+                  <span class="label">Per Month</span>
+                  <strong id="reward-month-usdt">-</strong>
+                </div>
+                <div class="metric">
                   <span class="label">Block Reward</span>
                   <strong id="reward-block-reward">-</strong>
                 </div>
               </div>
               <span id="reward-20s" class="hidden">-</span>
               <p class="panel-kicker" style="margin-top: 0.8rem; font-size: 0.76rem; margin-bottom: 0;">
-                Formula: block_reward × 0.95 × 0.35 / enabled_masternodes
+                Formula: block_reward × 0.95 × 0.35 / enabled_masternodes; monthly USDT uses cached explorer price.
               </p>
             </div>
             <div id="reward-unconfigured-container" class="hidden">
@@ -196,10 +200,6 @@
               <strong id="fork-current-height">-</strong>
             </div>
             <div class="metric">
-              <span class="label">Post-upgrade blocks</span>
-              <strong id="fork-blocks-after">-</strong>
-            </div>
-            <div class="metric">
               <span class="label">Last block age</span>
               <strong id="fork-last-block-age">-</strong>
             </div>
@@ -222,6 +222,10 @@
           <details class="raw-snapshot-details" style="margin-top: 1.2rem; border-top: 1px solid var(--border); padding-top: 0.8rem;">
             <summary class="panel-kicker" style="cursor: pointer; user-select: none;">Legacy Fork Details</summary>
             <div class="metric-grid fork-grid" style="margin-top: 0.8rem;">
+              <div class="metric">
+                <span class="label">Post-upgrade blocks</span>
+                <strong id="fork-blocks-after">-</strong>
+              </div>
               <div class="metric">
                 <span class="label">Blocks remaining</span>
                 <strong id="fork-countdown">-</strong>
