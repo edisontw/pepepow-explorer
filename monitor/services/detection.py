@@ -9,7 +9,7 @@ from monitor.services.aggregation import build_peer_version_summary
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 FORK_WARNING_BLOCKS = 720
 FORK_CRITICAL_BLOCKS = 180
-SITE_FAILURE_ALERT_THRESHOLD = 2
+SITE_FAILURE_ALERT_THRESHOLD = 3
 
 
 def build_alert(
@@ -199,7 +199,7 @@ def detect_no_new_block_alert(
             build_alert(
                 "slow_blocks",
                 "warning",
-                "Last block age elevated",
+                "Block arrival delayed",
                 f"Last block age is {age} seconds. This can happen during normal PEPEPOW RPC lag; monitor for persistence.",
                 source="rpc_local",
                 details={"age_seconds": age},
@@ -214,14 +214,14 @@ def detect_mempool_alert(
     mempool_zero_duration: int,
     zero_window_has_new_blocks: bool,
 ) -> list[dict[str, Any]]:
-    if mempool_txs != 0 or mempool_zero_duration <= 600 or not zero_window_has_new_blocks:
+    if mempool_txs != 0 or mempool_zero_duration <= 1800 or not zero_window_has_new_blocks:
         return []
     return [
         build_alert(
             "mempool_zero",
-            "warning",
-            "Mempool empty while blocks advance",
-            f"Mempool has been empty for {mempool_zero_duration} seconds while new blocks were still arriving.",
+            "info",
+            "Mempool quiet",
+            f"Mempool has been quiet for {mempool_zero_duration} seconds while blocks were still arriving.",
             source="public_api_remote",
             details={"duration_seconds": mempool_zero_duration},
         )
@@ -305,7 +305,7 @@ def detect_fork_stall_alert(fork_status: dict[str, Any]) -> list[dict[str, Any]]
         build_alert(
             "fork_stall",
             level,
-            "Chain may be stalled",
+            "Block arrival delayed",
             f"Last block age is {last_block_age} seconds. This threshold is relaxed for normal PEPEPOW RPC lag.",
             source="rpc_local",
             details={
@@ -323,9 +323,9 @@ def detect_mempool_zero_alert(mempool_txs: int | None, recent_blocks: list[dict[
     return [
         build_alert(
             "mempool_zero_recent",
-            "warning",
-            "Mempool empty while blocks continue",
-            "The mempool is empty even though recent blocks are being produced.",
+            "info",
+            "Mempool quiet",
+            "The mempool is quiet even though recent blocks are being produced.",
             source="public_api_remote",
             details={"recent_blocks": len(recent_blocks)},
         )
@@ -342,7 +342,7 @@ def detect_site_health_alerts(public_sites: list[dict[str, Any]]) -> list[dict[s
                 build_alert(
                     "public_site_down",
                     "warning",
-                    "Public service unavailable",
+                    "Public endpoint probe failed",
                     f"{site.get('name') or site.get('url')} has failed {failures} consecutive checks.",
                     source="site_status",
                     details={"id_suffix": str(site.get("name") or site.get("url")), "failures": failures},
@@ -354,13 +354,15 @@ def detect_site_health_alerts(public_sites: list[dict[str, Any]]) -> list[dict[s
 def detect_source_degraded_alert(source_health: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     for name, status in source_health.items():
-        if status.get("status") in {"down", "cooldown"}:
+        state = status.get("status")
+        if state in {"down", "cooldown"}:
+            severity = "warning" if name in {"rpc_local", "explorer_local"} else "info"
             alerts.append(
                 build_alert(
                     "source_down",
-                    "warning",
-                    "Data source unavailable",
-                    f"{name} is {status.get('status')}: {status.get('last_error') or 'no recent successful check'}.",
+                    severity,
+                    "Data source unavailable" if severity == "warning" else "Secondary data source unavailable",
+                    f"{name} is {state}: {status.get('last_error') or 'no recent successful check'}.",
                     source=name,
                     details={"id_suffix": name},
                 )
