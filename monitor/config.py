@@ -143,7 +143,6 @@ class MiningPoolTarget:
     enabled: bool = True
 
 
-
 @dataclass(slots=True)
 class Settings:
     repo_root: Path
@@ -329,13 +328,13 @@ def load_settings() -> Settings:
     ) or 60
     target_version = os.getenv("MONITOR_MIN_UPGRADED_SUBVER", "2.9.0.2")
 
-    block_reward_val = os.getenv("MONITOR_BLOCK_REWARD")
-    monitor_block_reward = None
-    if block_reward_val:
+    block_reward_val = os.getenv("MONITOR_BLOCK_REWARD", "7000")
+    monitor_block_reward = 7000.0
+    if block_reward_val and block_reward_val.strip():
         try:
             monitor_block_reward = float(block_reward_val)
         except ValueError:
-            pass
+            monitor_block_reward = 7000.0
 
     return Settings(
         repo_root=repo_root,
