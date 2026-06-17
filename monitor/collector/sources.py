@@ -135,6 +135,40 @@ class MonitorSources:
             raise RuntimeError("invalid explorer summary payload")
         return payload
 
+    async def explorer_get_cached_price(self) -> float | None:
+        response = await self.http_client.get(f"{self.settings.explorer_base_url}/ext/getcurrentprice")
+        response.raise_for_status()
+        text = response.text.strip()
+        try:
+            payload: Any = response.json()
+        except ValueError:
+            payload = text
+        return self._extract_price(payload)
+
+    def _extract_price(self, payload: Any) -> float | None:
+        if payload is None:
+            return None
+        if isinstance(payload, (int, float)):
+            return float(payload) if float(payload) > 0 else None
+        if isinstance(payload, str):
+            cleaned = re.sub(r"[^0-9.eE-]", "", payload)
+            try:
+                value = float(cleaned)
+            except ValueError:
+                return None
+            return value if value > 0 else None
+        if isinstance(payload, dict):
+            for key in ("price", "last", "usd", "usdt", "price_usd", "price_usdt", "current_price", "last_usd_price"):
+                if key in payload:
+                    value = self._extract_price(payload.get(key))
+                    if value is not None:
+                        return value
+            for value in payload.values():
+                nested = self._extract_price(value)
+                if nested is not None:
+                    return nested
+        return None
+
     async def explorer_get_masternodecount(self) -> dict[str, int]:
         response = await self.http_client.get(f"{self.settings.explorer_base_url}/api/getmasternodecount")
         response.raise_for_status()
