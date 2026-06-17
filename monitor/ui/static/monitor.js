@@ -225,6 +225,92 @@ function renderFreshnessSummary(freshness) {
   `;
 }
 
+/**
+ * Renders the top status banner using plain-language health summary.
+ * Uses green for healthy/ok, yellow for stale/unknown/checking, red for down/error/stalled.
+ */
+function renderStatusBanner(snapshot) {
+  const banner = byId("status-banner");
+  const iconEl = byId("status-banner-icon");
+  const textEl = byId("status-banner-text");
+  const metaEl = byId("status-banner-meta");
+  if (!banner || !textEl) {
+    return;
+  }
+
+  const fork = snapshot.fork || {};
+  const freshness = snapshot.freshness || {};
+  const services = snapshot.services || {};
+  const overallFreshness = freshness.overall_status || "unknown";
+  const chainMoving = fork.chain_moving_status || "unknown";
+  const forkState = fork.state || "";
+  const servicesStatus = services.summary?.overall_status || "unknown";
+
+  // Determine severity tier: bad > warn > ok
+  const isBad =
+    overallFreshness === "critical_stale" ||
+    chainMoving === "stalled" ||
+    servicesStatus === "down";
+
+  const isWarn =
+    !isBad && (
+      overallFreshness === "stale" ||
+      chainMoving === "slow" ||
+      overallFreshness === "unknown" ||
+      chainMoving === "unknown" ||
+      servicesStatus === "degraded"
+    );
+
+  const isOk = !isBad && !isWarn;
+
+  // Build human-readable label
+  let label = "";
+  if (isBad) {
+    if (chainMoving === "stalled") {
+      label = "Chain Stalled";
+    } else if (overallFreshness === "critical_stale") {
+      label = "Data Critically Stale";
+    } else {
+      label = "Network Issue Detected";
+    }
+  } else if (isWarn) {
+    if (overallFreshness === "stale") {
+      label = "Data Stale — Checking";
+    } else if (chainMoving === "slow") {
+      label = "Chain Slow — Monitoring";
+    } else {
+      label = "Checking Network Status";
+    }
+  } else {
+    // Healthy — include fork state if post-fork
+    if (forkState === "POST_FORK") {
+      label = "Network Healthy \u00b7 Post-Fork Stable";
+    } else if (forkState === "PRE_FORK") {
+      label = "Network Healthy \u00b7 Pre-Fork";
+    } else {
+      label = "Network Healthy";
+    }
+  }
+
+  // Meta: height + last block age + services summary
+  const metaParts = [];
+  if (snapshot.height) {
+    metaParts.push(`Height ${formatNumber(snapshot.height)}`);
+  }
+  if (snapshot.last_block_age !== null && snapshot.last_block_age !== undefined) {
+    metaParts.push(`Last block ${formatDuration(snapshot.last_block_age)} ago`);
+  }
+  if (servicesStatus && servicesStatus !== "unknown") {
+    metaParts.push(`Services: ${servicesStatus}`);
+  }
+
+  // Apply classes
+  banner.className = `status-banner status-banner-${isBad ? "bad" : isWarn ? "warn" : "ok"}`;
+  iconEl.textContent = isBad ? "\u274c" : isWarn ? "\u26a0\ufe0f" : "\u2705";
+  textEl.textContent = label;
+  metaEl.textContent = metaParts.length ? metaParts.join("  \u00b7  ") : "";
+}
+
 function renderAnomalySummary(anomalies) {
   const container = byId("anomaly-summary");
   if (!container) {
@@ -556,12 +642,28 @@ function renderFork(fork, snapshot = {}) {
   setText("fork-hoohash-bit", fork.hoohash_bit ? `0x${Number(fork.hoohash_bit).toString(16)}` : "-");
   setText("fork-xelis-bit", fork.xelis_bit ? `0x${Number(fork.xelis_bit).toString(16)}` : "-");
 
-  // New post-fork indicators:
+  // Post-fork block-time metrics — deduplicate identical windows
+  const t8m  = snapshot.avg_block_time_8m;
+  const t30m = snapshot.avg_block_time_30m;
+  const t2h  = snapshot.avg_block_time_2h;
   setText("fork-blocks-after", formatNumber(fork.blocks_after_fork));
   setText("fork-last-block-age", formatDuration(fork.last_block_age));
-  setText("fork-avg-block-8m", formatFloat(snapshot.avg_block_time_8m, 2, "s"));
-  setText("fork-avg-block-30m", formatFloat(snapshot.avg_block_time_30m, 2, "s"));
-  setText("fork-avg-block-2h", formatFloat(snapshot.avg_block_time_2h, 2, "s"));
+  // Primary value: prefer 8m; fall back to whatever is available
+  const primaryBlockTime = t8m ?? t30m ?? t2h ?? null;
+  setText("fork-avg-block-8m", formatFloat(primaryBlockTime, 2, "s"));
+
+  // Build secondary detail only when windows differ or have distinct values
+  const windowDetail = byId("fork-block-time-windows");
+  if (windowDetail) {
+    const parts = [];
+    if (t30m !== null && t30m !== undefined && t30m !== t8m) {
+      parts.push(`30m: ${formatFloat(t30m, 2, "s")}`);
+    }
+    if (t2h !== null && t2h !== undefined && t2h !== t8m && t2h !== t30m) {
+      parts.push(`2h: ${formatFloat(t2h, 2, "s")}`);
+    }
+    windowDetail.textContent = parts.length ? parts.join("  \u00b7  ") : "";
+  }
 
   const movingBadge = byId("fork-moving-status");
   if (movingBadge) {
@@ -632,7 +734,24 @@ function renderSnapshot(snapshot) {
   setText("generated-at", formatAbsoluteUtc(snapshot.generated_at));
   setText("generated-at-relative", formatRelativeTime(snapshot.generated_at));
   setText("network-height", formatNumber(snapshot.height));
-  setText("network-avg-block-8m", formatFloat(snapshot.avg_block_time_8m ?? snapshot.avg_block_time_5m ?? snapshot.avg_block_time_3m, 2, "s"));
+
+  // Block-time for Network Status: show primary value; add detail when windows differ
+  const nt8m  = snapshot.avg_block_time_8m ?? snapshot.avg_block_time_5m ?? snapshot.avg_block_time_3m;
+  const nt30m = snapshot.avg_block_time_30m;
+  const nt2h  = snapshot.avg_block_time_2h;
+  setText("network-avg-block-8m", formatFloat(nt8m, 2, "s"));
+  const netDetailEl = byId("network-block-time-detail");
+  if (netDetailEl) {
+    const netParts = [];
+    if (nt30m !== null && nt30m !== undefined && nt30m !== nt8m) {
+      netParts.push(`30m: ${formatFloat(nt30m, 2, "s")}`);
+    }
+    if (nt2h !== null && nt2h !== undefined && nt2h !== nt8m && nt2h !== nt30m) {
+      netParts.push(`2h: ${formatFloat(nt2h, 2, "s")}`);
+    }
+    netDetailEl.textContent = netParts.length ? netParts.join("  \u00b7  ") : "";
+  }
+
   setText("network-last-block-age", formatDuration(snapshot.last_block_age));
   setText("network-freshness", snapshot.freshness?.overall_status || snapshot.freshness?.status || "-");
   setText("network-difficulty", snapshot.difficulty ?? "-");
@@ -645,6 +764,7 @@ function renderSnapshot(snapshot) {
     : snapshot.rpc_local_status || "-";
   setText("network-rpc-status", rpcStatus);
 
+  renderStatusBanner(snapshot);
   renderFreshnessSummary(snapshot.freshness || {});
   renderFork(snapshot.fork || {}, snapshot);
   const masternodesKey = buildSignature([
@@ -982,11 +1102,17 @@ function renderMyNodes(payload = latestMasternodesPayload) {
     return;
   }
 
+  // Trash SVG icon for remove button (static, no user input interpolated)
+  const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+
   resolved.forEach(({ node, match }, index) => {
     const status = myNodeStatus(match);
-    let compatLabel = "-";
-    let compatClass = "unknown";
-    if (match) {
+    let compatLabel;
+    let compatClass;
+    if (!match) {
+      compatLabel = "-";
+      compatClass = "unknown";
+    } else {
       const isCompat = isMasternodeCompatible(match, latestSnapshotTargetVersion);
       if (isCompat === true) {
         compatLabel = "Compatible";
@@ -995,7 +1121,8 @@ function renderMyNodes(payload = latestMasternodesPayload) {
         compatLabel = "Legacy";
         compatClass = "legacy";
       } else {
-        compatLabel = "Unknown";
+        // null = version not parseable / data not yet available
+        compatLabel = "Checking";
         compatClass = "unknown";
       }
     }
@@ -1009,9 +1136,9 @@ function renderMyNodes(payload = latestMasternodesPayload) {
       <td>${match ? formatUnixRelativeTime(match.lastseen) : "-"}</td>
       <td>${escapeHtml(formatNodeVersion(match))}</td>
       <td>-</td>
-      <td><span class="version-tag ${compatClass}">${compatLabel}</span></td>
+      <td><span class="version-tag ${compatClass}">${escapeHtml(compatLabel)}</span></td>
       <td>${escapeHtml(match?.ip || "-")}</td>
-      <td><button type="button" class="remove-node-button" data-node-index="${index}" aria-label="Remove node">x</button></td>
+      <td><button type="button" class="remove-node-button" data-node-index="${index}" aria-label="Remove node">${trashIcon}</button></td>
     `;
     body.appendChild(row);
   });

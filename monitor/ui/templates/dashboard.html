@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ root_path }}/static/monitor.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      integrity="sha384-HnVaD4gHpvY+Q5NuYQRm4Kfzh/OiHVZ4ILkivxidBhZMBuKXrWNaT0MoSu1gFQN"
+      crossorigin="anonymous"
+      defer
+    ></script>
     <script src="{{ root_path }}/static/monitor.js" defer></script>
   </head>
   <body data-root-path="{{ root_path }}">
@@ -29,54 +34,73 @@
         </div>
       </header>
 
+      <!-- Status Banner -->
+      <div id="status-banner" class="status-banner status-banner-checking" aria-live="polite">
+        <span id="status-banner-icon" class="status-banner-icon">⏳</span>
+        <span id="status-banner-text" class="status-banner-text">Loading network status…</span>
+        <span id="status-banner-meta" class="status-banner-meta"></span>
+      </div>
+
+      <!-- Network Status: primary large metrics + telemetry sub-section -->
       <section class="panel-grid top-grid">
         <article class="panel">
           <div class="panel-heading">
             <h2>Network Status</h2>
             <span class="panel-kicker">Live metrics</span>
           </div>
-          <div class="metric-grid">
-            <div class="metric">
+
+          <!-- Primary large metric cards -->
+          <div class="metric-grid primary-metric-grid">
+            <div class="metric metric-primary">
               <span class="label">Height</span>
               <strong id="network-height">-</strong>
             </div>
-            <div class="metric">
-              <span class="label">Avg block time (8m)</span>
-              <strong id="network-avg-block-8m">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Last block age</span>
-              <strong id="network-last-block-age">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Data freshness</span>
-              <strong id="network-freshness">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Difficulty</span>
-              <strong id="network-difficulty">-</strong>
-            </div>
-            <div class="metric">
+            <div class="metric metric-primary">
               <span class="label">Hashrate</span>
               <strong id="network-hashrate">-</strong>
             </div>
-            <div class="metric">
-              <span class="label">Upgrade summary</span>
-              <strong id="network-upgrade-summary">-</strong>
+            <div class="metric metric-primary">
+              <span class="label">Avg block time</span>
+              <strong id="network-avg-block-8m">-</strong>
+              <span id="network-block-time-detail" class="metric-detail"></span>
             </div>
-            <div class="metric">
-              <span class="label">Services</span>
-              <strong id="network-services-status">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Mempool txs</span>
-              <strong id="network-mempool-size">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">RPC status</span>
-              <strong id="network-rpc-status">-</strong>
+            <div class="metric metric-primary">
+              <span class="label">Last block age</span>
+              <strong id="network-last-block-age">-</strong>
             </div>
           </div>
+
+          <!-- Telemetry sub-section -->
+          <div class="telemetry-section">
+            <div class="telemetry-label">Telemetry Status</div>
+            <div class="metric-grid telemetry-grid">
+              <div class="metric metric-sm">
+                <span class="label">Data freshness</span>
+                <strong id="network-freshness">-</strong>
+              </div>
+              <div class="metric metric-sm">
+                <span class="label">RPC status</span>
+                <strong id="network-rpc-status">-</strong>
+              </div>
+              <div class="metric metric-sm">
+                <span class="label">Mempool txs</span>
+                <strong id="network-mempool-size">-</strong>
+              </div>
+              <div class="metric metric-sm">
+                <span class="label">Difficulty</span>
+                <strong id="network-difficulty">-</strong>
+              </div>
+              <div class="metric metric-sm">
+                <span class="label">Services</span>
+                <strong id="network-services-status">-</strong>
+              </div>
+              <div class="metric metric-sm">
+                <span class="label">Upgrade summary</span>
+                <strong id="network-upgrade-summary">-</strong>
+              </div>
+            </div>
+          </div>
+
           <div id="freshness-summary" class="stack compact-stack"></div>
         </article>
 
@@ -154,17 +178,11 @@
               <span class="label">Last block age</span>
               <strong id="fork-last-block-age">-</strong>
             </div>
+            <!-- Primary avg block time; window detail shown as secondary text -->
             <div class="metric">
-              <span class="label">Avg block time (8m)</span>
+              <span class="label">Avg block time</span>
               <strong id="fork-avg-block-8m">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Avg block time (30m)</span>
-              <strong id="fork-avg-block-30m">-</strong>
-            </div>
-            <div class="metric">
-              <span class="label">Avg block time (2h)</span>
-              <strong id="fork-avg-block-2h">-</strong>
+              <span id="fork-block-time-windows" class="metric-detail"></span>
             </div>
           </div>
 
@@ -244,6 +262,7 @@
         </article>
       </section>
 
+      <!-- My Nodes: form above the table -->
       <section class="panel-grid">
         <article class="panel wide-panel">
           <div class="panel-heading">
@@ -253,6 +272,7 @@
             </div>
             <span id="my-nodes-list-generated-at" class="panel-kicker">Last MN sync: unavailable</span>
           </div>
+          <!-- Add-node form placed above the table -->
           <div class="my-nodes-form">
             <input
               id="my-nodes-key"
@@ -266,7 +286,9 @@
               type="text"
               placeholder="Optional label"
             />
-            <button id="my-nodes-add" class="my-nodes-add-button" type="button">+</button>
+            <button id="my-nodes-add" class="my-nodes-add-button" type="button" aria-label="Add node">
+              + Add Node
+            </button>
           </div>
           <div id="my-nodes-message" class="my-nodes-message" aria-live="polite"></div>
           <div class="table-wrap">
