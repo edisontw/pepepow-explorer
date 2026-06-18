@@ -60,15 +60,20 @@ def evaluate_fork_state(
     block_target_seconds: int = 60,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     state = determine_fork_state(current_height, fork_height)
-    suspicious_blocks = [block for block in recent_blocks if fork_height is not None and block["height"] < fork_height and block["has_hoohash_bit"]]
+    suspicious_blocks = [
+        block
+        for block in recent_blocks
+        if fork_height is not None and block["height"] < fork_height and block["has_hoohash_bit"]
+    ]
     invalid_blocks = [block for block in recent_blocks if block["has_hoohash_bit"] and block["has_xelis_bit"]]
-    activation_blocks = [block for block in recent_blocks if fork_height is not None and block["height"] >= fork_height and block["has_hoohash_bit"]]
+    activation_blocks = [
+        block
+        for block in recent_blocks
+        if fork_height is not None and block["height"] >= fork_height and block["has_hoohash_bit"]
+    ]
     activation_seen = bool(activation_blocks)
 
     alerts: list[dict[str, Any]] = []
-    # The fork is long past activation for the public monitor. Missing legacy fork
-    # parameters should not dominate the live health view as a critical alert.
-
     for block in suspicious_blocks:
         alerts.append(
             build_alert(
@@ -92,12 +97,8 @@ def evaluate_fork_state(
 
     countdown_blocks = max((fork_height or 0) - (current_height or 0), 0) if fork_height is not None and current_height is not None else None
     readiness_level, readiness_reasons = _evaluate_fork_readiness(state, countdown_blocks)
-    stall_level = _evaluate_fork_stall_level(
-        state,
-        countdown_blocks,
-        last_block_age,
-        block_target_seconds,
-    )
+    stall_level = _evaluate_fork_stall_level(state, countdown_blocks, last_block_age, block_target_seconds)
+
     fork_status = {
         "fork_height": fork_height,
         "current_height": current_height,
@@ -144,7 +145,6 @@ def _evaluate_fork_readiness(state: str, countdown_blocks: int | None) -> tuple[
     elif state == "POST_FORK":
         reasons.append("Hoohash upgrade is active on the monitored chain.")
         return "normal", reasons
-
     return "normal", reasons
 
 
@@ -156,13 +156,11 @@ def _evaluate_fork_stall_level(
 ) -> str:
     if last_block_age is None or block_target_seconds <= 0:
         return "normal"
-
     in_alert_window = state in {"ACTIVATING", "POST_FORK"} or (
         state == "PRE_FORK" and countdown_blocks is not None and countdown_blocks <= FORK_WARNING_BLOCKS
     )
     if not in_alert_window:
         return "normal"
-
     if last_block_age > block_target_seconds * 12:
         return "critical"
     if last_block_age > block_target_seconds * 8:
@@ -178,11 +176,8 @@ def detect_no_new_block_alert(
 ) -> list[dict[str, Any]]:
     if not recent_blocks:
         return []
-    latest_block = recent_blocks[-1]
-    latest_time = int(latest_block["time"])
-    now = current_timestamp or int(time.time())
-    age = now - latest_time
-
+    latest_time = int(recent_blocks[-1]["time"])
+    age = (current_timestamp or int(time.time())) - latest_time
     if age > block_target_seconds * 12:
         return [
             build_alert(
@@ -228,11 +223,7 @@ def detect_mempool_alert(
     ]
 
 
-def detect_rpc_health_alert(
-    *,
-    rpc_local_status: str,
-    cooldown_active_seconds: int,
-) -> list[dict[str, Any]]:
+def detect_rpc_health_alert(*, rpc_local_status: str, cooldown_active_seconds: int) -> list[dict[str, Any]]:
     if rpc_local_status != "cooldown" or cooldown_active_seconds <= 300:
         return []
     return [
@@ -247,12 +238,7 @@ def detect_rpc_health_alert(
     ]
 
 
-def detect_upgrade_ratio_alert(
-    *,
-    countdown_blocks: int | None,
-    upgrade_ratio: float,
-    target_version: str,
-) -> list[dict[str, Any]]:
+def detect_upgrade_ratio_alert(*, countdown_blocks: int | None, upgrade_ratio: float, target_version: str) -> list[dict[str, Any]]:
     if countdown_blocks is None or countdown_blocks > 500 or upgrade_ratio >= 0.80:
         return []
     percent = round(upgrade_ratio * 100, 2)
@@ -272,14 +258,9 @@ def detect_fork_readiness_alert(fork_status: dict[str, Any]) -> list[dict[str, A
     level = str(fork_status.get("readiness_level") or "normal")
     if level not in {"warning", "critical"}:
         return []
-
     remaining_blocks = fork_status.get("remaining_blocks")
     title = "Fork approaching" if level == "warning" else "Fork imminent"
-    message = (
-        f"Fork height is {remaining_blocks} blocks away."
-        if remaining_blocks is not None
-        else "Fork activation window is active."
-    )
+    message = f"Fork height is {remaining_blocks} blocks away." if remaining_blocks is not None else "Fork activation window is active."
     return [
         build_alert(
             "fork_readiness",
@@ -287,10 +268,7 @@ def detect_fork_readiness_alert(fork_status: dict[str, Any]) -> list[dict[str, A
             title,
             message,
             source="monitor",
-            details={
-                "remaining_blocks": remaining_blocks,
-                "state": fork_status.get("state"),
-            },
+            details={"remaining_blocks": remaining_blocks, "state": fork_status.get("state")},
         )
     ]
 
@@ -299,7 +277,6 @@ def detect_fork_stall_alert(fork_status: dict[str, Any]) -> list[dict[str, Any]]
     level = str(fork_status.get("stall_level") or "normal")
     if level not in {"warning", "critical"}:
         return []
-
     last_block_age = fork_status.get("last_block_age")
     return [
         build_alert(
@@ -375,11 +352,20 @@ def sort_alerts(alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def summarize_peers(peerinfo: list[dict[str, Any]], min_upgraded_subver: str | None) -> dict[str, Any]:
-    versions = build_peer_version_summary(peerinfo, min_upgraded_subver)
-    return {
-        "total_peers": len(peerinfo),
-        "upgraded_peers": sum(item["count"] for item in versions if item["is_upgraded"] is True),
-        "legacy_peers": sum(item["count"] for item in versions if item["is_upgraded"] is False),
-        "unknown_peers": sum(item["count"] for item in versions if item["is_upgraded"] is None),
-        "versions": versions,
-    }
+    summary = build_peer_version_summary(peerinfo, min_upgraded_subver)
+    if not isinstance(summary, dict):
+        return {
+            "total_peers": len(peerinfo),
+            "upgraded_peers": 0,
+            "legacy_peers": 0,
+            "unknown_peers": len(peerinfo),
+            "upgrade_percent": 0.0,
+            "versions": [],
+        }
+    summary.setdefault("total_peers", len(peerinfo))
+    summary.setdefault("upgraded_peers", 0)
+    summary.setdefault("legacy_peers", 0)
+    summary.setdefault("unknown_peers", 0)
+    summary.setdefault("upgrade_percent", 0.0)
+    summary.setdefault("versions", [])
+    return summary
