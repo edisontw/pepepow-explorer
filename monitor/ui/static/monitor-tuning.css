@@ -40,28 +40,144 @@
   font-size: 1rem;
 }
 
+/* Services + PEPEW Light share the first row; Mining Pools gets a full row. */
 .lower-grid {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+}
+
+.lower-grid > .panel:first-child {
+  grid-column: span 5;
+}
+
+.lower-grid > #pepew-light-panel {
+  grid-column: span 7;
+}
+
+.lower-grid > .mining-pools-panel {
+  grid-column: 1 / -1;
+}
+
+.lower-grid > .panel {
+  min-width: 0;
+}
+
+/* Keep service tables readable without forcing wide empty columns. */
+.lower-grid table {
+  font-size: 0.88rem;
+}
+
+.lower-grid th,
+.lower-grid td {
+  padding: 9px 10px;
+  vertical-align: middle;
+}
+
+.lower-grid td a {
+  color: var(--info);
+  text-decoration: none;
+}
+
+.lower-grid td a:hover {
+  text-decoration: underline;
+}
+
+#pepew-light-panel .summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#pepew-light-panel pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .mining-pools-panel table {
-  min-width: 980px;
+  min-width: 860px;
+  table-layout: fixed;
 }
 
 .mining-pools-panel .endpoint-column {
-  min-width: 320px;
+  width: 30%;
+  min-width: 260px;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.mining-pools-panel th:nth-child(2),
+.mining-pools-panel td:nth-child(2) {
+  width: 10%;
+}
+
+.mining-pools-panel th:nth-child(3),
+.mining-pools-panel td:nth-child(3) {
+  width: 11%;
+  white-space: nowrap;
+}
+
+.mining-pools-panel th:nth-child(4),
+.mining-pools-panel td:nth-child(4),
+.mining-pools-panel th:nth-child(5),
+.mining-pools-panel td:nth-child(5) {
+  width: 17%;
 }
 
 .mining-pools-panel .error-column {
-  min-width: 220px;
+  width: 15%;
+  min-width: 150px;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1180px) {
   .lower-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lower-grid > .panel:first-child,
+  .lower-grid > #pepew-light-panel {
+    grid-column: span 1;
+  }
+
+  .lower-grid > .mining-pools-panel {
+    grid-column: 1 / -1;
+  }
+
+  #pepew-light-panel .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .lower-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lower-grid > .panel:first-child,
+  .lower-grid > #pepew-light-panel,
+  .lower-grid > .mining-pools-panel {
+    grid-column: 1;
+  }
+
+  .lower-grid .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mining-pools-panel table {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 560px) {
+  #pepew-light-panel .summary-grid {
     grid-template-columns: 1fr;
   }
 }
