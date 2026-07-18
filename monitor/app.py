@@ -86,11 +86,12 @@ async def apply_rate_limit(request: Request, call_next):
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "title": settings.title,
-            "root_path": settings.root_path.rstrip("/"),
-        },
+    template = templates.get_template("dashboard.html")
+    html = template.render(
+        request=request,
+        title=settings.title,
+        root_path=settings.root_path.rstrip("/"),
     )
+    light_script = f'<script src="{settings.root_path.rstrip("/")}/static/monitor-light.js" defer></script>'
+    html = html.replace("</body>", f"  {light_script}\n  </body>")
+    return HTMLResponse(html)
