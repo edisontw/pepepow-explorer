@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from monitor.cache.base import CacheBackend
-from monitor.collector.normalize import block_to_sample
+from monitor.collector.normalize import block_to_sample, calculate_block_reward
 from monitor.collector.sources import MonitorSources
 from monitor.config import ComparisonSource, Settings
 from monitor.services.aggregation import (
@@ -434,7 +434,10 @@ class MonitorCollector:
             site_checks_generated_at_unix=site_checks_generated_at_unix,
         )
 
-        block_reward = self.settings.monitor_block_reward
+        if self.settings.monitor_block_reward is not None:
+            block_reward = self.settings.monitor_block_reward
+        else:
+            block_reward = calculate_block_reward(authoritative_height)
         enabled_masternodes = masternode_summary.get("enabled", 0)
         per_20s = None
         per_hour = None

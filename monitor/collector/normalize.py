@@ -59,3 +59,21 @@ def merge_recent_blocks(existing: list[dict[str, Any]], new_blocks: list[dict[st
         combined[int(block["height"])] = block
     ordered = [combined[height] for height in sorted(combined)]
     return ordered[-limit:]
+
+
+def calculate_block_reward(height: int | None) -> float:
+    """Calculate PEPEPOW block reward dynamically based on block height.
+
+    Emission schedule:
+    - Heights < 2,189,200: 16,000 PEPEW
+    - Heights [2,189,200, 2,318,800): 16,000 PEPEW
+    - Then reducing by 500 every 129,600 blocks until a minimum of 5,000 PEPEW.
+    """
+    if height is None:
+        return 5500.0
+    if height < 2189200:
+        return 16000.0
+    step = (height - 2189200) // 129600
+    reward = 16000.0 - (step * 500.0)
+    return max(5000.0, float(reward))
+

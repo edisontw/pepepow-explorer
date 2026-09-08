@@ -280,10 +280,9 @@ def load_settings() -> Settings:
 
     mining_pool_targets = [
         MiningPoolTarget(host="hoohash-pepew.eu.mine.zpool.ca", port=8335, name="(zpool) stratum+tcp://hoohash-pepew.eu.mine.zpool.ca:8335"),
-        MiningPoolTarget(host="eu.mining4people.com", port=4176, name="(M4P) eu.mining4people.com:4176"),
-        MiningPoolTarget(host="us-west.mining4people.com", port=4176, name="(M4P) us-west.mining4people.com:4176"),
         MiningPoolTarget(host="stratum-eu.pepepow.foztor.net", port=13232, name="(foztor) stratum-eu.pepepow.foztor.net:13232"),
         MiningPoolTarget(host="pool.pepepow.net", port=39333, name="Lab — pool.pepepow.net:39333"),
+        MiningPoolTarget(host="pool.pepepow.net", port=39334, name="Lab — pool.pepepow.net(SOLO):39334"),
     ]
     mining_pools_raw = os.getenv("MONITOR_MINING_POOL_TARGETS")
     if mining_pools_raw:
@@ -328,13 +327,13 @@ def load_settings() -> Settings:
     ) or 60
     target_version = os.getenv("MONITOR_MIN_UPGRADED_SUBVER", "2.9.0.2")
 
-    block_reward_val = os.getenv("MONITOR_BLOCK_REWARD", "6500")
-    monitor_block_reward = 6500.0
+    block_reward_val = os.getenv("MONITOR_BLOCK_REWARD")
+    monitor_block_reward = None
     if block_reward_val and block_reward_val.strip():
         try:
             monitor_block_reward = float(block_reward_val)
         except ValueError:
-            monitor_block_reward = 6500.0
+            monitor_block_reward = None
 
     return Settings(
         repo_root=repo_root,
