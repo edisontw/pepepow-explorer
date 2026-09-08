@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PEPEPOW Explorer Disk Space Monitor Every 15 Minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
