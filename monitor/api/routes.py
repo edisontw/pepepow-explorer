@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter
 
-from monitor.api.schemas import HealthModel, MasternodesPayloadModel, StatusModel
+from monitor.api.schemas import HealthModel, MasternodesPayloadModel, PublicSummaryModel, StatusModel
 
 
 _PRICE_CACHE_TTL_SECONDS = 600
@@ -28,6 +28,39 @@ async def _get_cached_price(collector) -> float | None:
         _price_cache["value"] = price
         _price_cache["updated_at"] = now
     return _price_cache["value"]
+
+
+def build_public_summary(payload: dict[str, Any], price: float | None) -> dict[str, Any]:
+    """Return a small allowlisted snapshot for public website consumers."""
+    freshness = dict(payload.get("freshness") or {})
+
+    network_status = freshness.get("overall_status") or freshness.get("status")
+    if not network_status:
+        network_status = "stale" if payload.get("stale", True) else "normal"
+
+    last_block_age = freshness.get("last_block_age_seconds")
+    if last_block_age is None:
+        last_block_age = payload.get("last_block_age")
+
+    avg_block_time = payload.get("avg_block_time_8m")
+    if avg_block_time is None:
+        avg_block_time = payload.get("avg_block_time_5m")
+    if avg_block_time is None:
+        avg_block_time = payload.get("avg_block_time_30blocks")
+
+    return {
+        "generated_at": payload.get("generated_at"),
+        "updated_at": payload.get("generated_at_unix"),
+        "stale": bool(payload.get("stale", True)),
+        "network_status": str(network_status),
+        "height": payload.get("height"),
+        "last_block_age_seconds": last_block_age,
+        "avg_block_time_seconds": avg_block_time,
+        "hashrate_hps": payload.get("hashrate_hps"),
+        "hashrate_display": payload.get("hashrate_display"),
+        "masternode_count": int(payload.get("masternode_enabled") or 0),
+        "price_usdt": price,
+    }
 
 
 def _with_price(payload: dict, price: float | None) -> dict:
@@ -113,6 +146,12 @@ def build_router(collector) -> APIRouter:
         payload = collector.get_status_payload()
         price = await _get_cached_price(collector)
         return _with_price(payload, price)
+
+    @router.get("/public-summary", response_model=PublicSummaryModel)
+    async def get_public_summary() -> dict:
+        payload = collector.get_status_payload()
+        price = await _get_cached_price(collector)
+        return build_public_summary(payload, price)
 
     @router.get("/light-status")
     async def get_light_status() -> dict:
