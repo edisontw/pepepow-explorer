@@ -5,7 +5,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from monitor.api.schemas import HealthModel, MasternodesPayloadModel, PublicSummaryModel, StatusModel
 
@@ -148,7 +148,9 @@ def build_router(collector) -> APIRouter:
         return _with_price(payload, price)
 
     @router.get("/public-summary", response_model=PublicSummaryModel)
-    async def get_public_summary() -> dict:
+    async def get_public_summary(response: Response) -> dict:
+        response.headers["Access-Control-Allow-Origin"] = "https://pepepow.net"
+        response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=90"
         payload = collector.get_status_payload()
         price = await _get_cached_price(collector)
         return build_public_summary(payload, price)
