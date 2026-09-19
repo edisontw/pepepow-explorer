@@ -57,18 +57,18 @@ class DetectionTests(unittest.TestCase):
         ]
         alerts = detect_no_new_block_alert(
             recent_blocks,
-            current_timestamp=1300,
+            current_timestamp=1800,
             block_target_seconds=60,
         )
         self.assertTrue(any(alert["type"] == "stalled_blocks" for alert in alerts))
 
     def test_mempool_zero_alert_requires_duration_and_new_blocks(self):
-        alerts = detect_mempool_alert(mempool_txs=0, mempool_zero_duration=601, zero_window_has_new_blocks=True)
+        alerts = detect_mempool_alert(mempool_txs=0, mempool_zero_duration=1801, zero_window_has_new_blocks=True)
         self.assertEqual(alerts[0]["type"], "mempool_zero")
-        self.assertEqual(detect_mempool_alert(mempool_txs=0, mempool_zero_duration=500, zero_window_has_new_blocks=True), [])
+        self.assertEqual(detect_mempool_alert(mempool_txs=0, mempool_zero_duration=1800, zero_window_has_new_blocks=True), [])
 
     def test_rpc_cooldown_too_long_alert(self):
-        alerts = detect_rpc_health_alert(rpc_local_status="cooldown", cooldown_active_seconds=121)
+        alerts = detect_rpc_health_alert(rpc_local_status="cooldown", cooldown_active_seconds=301)
         self.assertEqual(alerts[0]["type"], "rpc_cooldown_too_long")
 
     def test_low_upgrade_ratio_near_fork_alert(self):
@@ -78,11 +78,11 @@ class DetectionTests(unittest.TestCase):
     def test_source_degraded_alert(self):
         alerts = detect_source_degraded_alert(
             {
-                "explorer_local": {"name": "explorer_local", "status": "degraded"},
+                "explorer_local": {"name": "explorer_local", "status": "down"},
                 "public_api_remote": {"name": "public_api_remote", "status": "ok"},
             }
         )
-        self.assertEqual(alerts[0]["type"], "source_degraded")
+        self.assertEqual(alerts[0]["type"], "source_down")
 
     def test_fork_readiness_levels(self):
         fork_status, _ = evaluate_fork_state(
@@ -109,7 +109,7 @@ class DetectionTests(unittest.TestCase):
             target_version="2.9.0.2",
             fork_configured=True,
             eta_seconds=3000,
-            last_block_age=250,
+            last_block_age=721,
             block_target_seconds=60,
         )
         self.assertEqual(fork_status["stall_level"], "critical")
@@ -142,9 +142,9 @@ class DetectionTests(unittest.TestCase):
             [],
         )
         alerts = detect_site_health_alerts(
-            [{"name": "pepepow.org", "status": "down", "status_code": 502, "consecutive_failures": 2}]
+            [{"name": "pepepow.org", "status": "down", "status_code": 502, "consecutive_failures": 3}]
         )
-        self.assertEqual(alerts[0]["type"], "public_site_degraded")
+        self.assertEqual(alerts[0]["type"], "public_site_down")
 
 
 if __name__ == "__main__":
