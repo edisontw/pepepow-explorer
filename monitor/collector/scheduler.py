@@ -1645,6 +1645,46 @@ class MonitorCollector:
     def get_status_payload(self) -> dict[str, Any]:
         return self._snapshot()
 
+    def get_public_summary_payload(self) -> dict[str, Any]:
+        snapshot = self._snapshot()
+        services = snapshot.get("services") or {}
+        services_summary = services.get("summary") or {}
+        pool_summary = services.get("mining_pool_summary") or {}
+        freshness = snapshot.get("freshness") or {}
+
+        return {
+            "generated_at": snapshot.get("generated_at"),
+            "stale": bool(snapshot.get("stale", True)),
+            "height": snapshot.get("height"),
+            "hashrate_hps": snapshot.get("hashrate_hps"),
+            "hashrate_display": snapshot.get("hashrate_display"),
+            "difficulty": snapshot.get("difficulty"),
+            "peer_count": int(snapshot.get("peer_count") or 0),
+            "avg_block_time_8m": snapshot.get("avg_block_time_8m"),
+            "last_block_age_seconds": freshness.get(
+                "last_block_age_seconds",
+                snapshot.get("last_block_age"),
+            ),
+            "masternode_enabled": int(snapshot.get("masternode_enabled") or 0),
+            "masternode_total": int(snapshot.get("masternode_total") or 0),
+            "services": {
+                "overall_status": services_summary.get("overall_status", "unknown"),
+                "ok_count": int(services_summary.get("ok_count") or 0),
+                "degraded_count": int(services_summary.get("degraded_count") or 0),
+                "down_count": int(services_summary.get("down_count") or 0),
+                "mining_pool_total": int(pool_summary.get("total_pools") or 0),
+                "mining_pool_up": int(pool_summary.get("up_count") or 0),
+                "mining_pool_degraded": int(pool_summary.get("degraded_count") or 0),
+                "mining_pool_down": int(pool_summary.get("down_count") or 0),
+            },
+            "freshness": {
+                "snapshot_age_seconds": freshness.get("snapshot_age_seconds"),
+                "snapshot_status": freshness.get("snapshot_status", "normal"),
+                "last_block_status": freshness.get("last_block_status", "normal"),
+                "overall_status": freshness.get("overall_status", "normal"),
+            },
+        }
+
     def get_masternodes_payload(self) -> dict[str, Any]:
         snapshot = self._snapshot()
         masternodes = self.cache.get_json(self._MASTERNODES_CACHE_KEY, {}) or {}
