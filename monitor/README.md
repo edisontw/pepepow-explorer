@@ -134,6 +134,7 @@ MONITOR_MIN_UPGRADED_SUBVER=2.9.0.2
 ## API
 
 - `GET /monitor/api/status`
+- `GET /monitor/api/public-summary`
 - `GET /monitor/api/masternodes`
 - `GET /monitor/api/fork`
 - `GET /monitor/api/hashrate`
@@ -141,6 +142,18 @@ MONITOR_MIN_UPGRADED_SUBVER=2.9.0.2
 - `GET /monitor/api/blocks/recent`
 - `GET /monitor/api/alerts`
 - `GET /monitor/api/health`
+
+### `GET /monitor/api/public-summary`
+
+Small cross-origin-safe payload for `pepepow.net` Network Pulse UI. It is intentionally
+allowlisted and cache-only: it reads the same latest snapshot as the dashboard and exposes only
+height, hashrate, difficulty, peer count, recent block timing, masternode counts, compact service
+counts, and freshness state. It omits peer details, hashes, alerts, masternode records/versions,
+RPC state, and operator diagnostics.
+
+Responses allow browser reads only from `https://pepepow.net` and
+`https://www.pepepow.net`, and include a short public cache lifetime. The endpoint does not
+trigger RPC, explorer, pool, or other upstream collection.
 
 ### `GET /monitor/api/status`
 
