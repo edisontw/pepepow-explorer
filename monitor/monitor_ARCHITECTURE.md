@@ -364,6 +364,7 @@ Fork monitoring depends on already-collected block and summary state rather than
 Main endpoints:
 
 - `GET /monitor/api/status`
+- `GET /monitor/api/public-summary`
 - `GET /monitor/api/masternodes`
 - `GET /monitor/api/fork`
 - `GET /monitor/api/hashrate`
@@ -374,7 +375,8 @@ Main endpoints:
 
 Design intent:
 
-- `status` is the primary dashboard endpoint
+- `status` is the primary operator/dashboard endpoint
+- `public-summary` is the strict allowlisted cross-origin slice for the static pepepow.net Network Pulse
 - the other endpoints expose narrower slices of the same cached state
 
 ## Operational Notes

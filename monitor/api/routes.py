@@ -5,13 +5,14 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 
-from monitor.api.schemas import HealthModel, MasternodesPayloadModel, StatusModel
+from monitor.api.schemas import HealthModel, MasternodesPayloadModel, PublicSummaryModel, StatusModel
 
 
 _PRICE_CACHE_TTL_SECONDS = 600
 _LIGHT_CACHE_TTL_SECONDS = 20
+_PUBLIC_SITE_ORIGINS = {"https://pepepow.net", "https://www.pepepow.net"}
 _price_cache: dict[str, float | None] = {"value": None, "updated_at": 0.0}
 _light_cache: dict[str, Any] = {"value": None, "updated_at": 0.0}
 
@@ -113,6 +114,15 @@ def build_router(collector) -> APIRouter:
         payload = collector.get_status_payload()
         price = await _get_cached_price(collector)
         return _with_price(payload, price)
+
+    @router.get("/public-summary", response_model=PublicSummaryModel)
+    async def get_public_summary(request: Request, response: Response) -> dict:
+        origin = request.headers.get("origin")
+        if origin in _PUBLIC_SITE_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+        response.headers["Cache-Control"] = "public, max-age=10, stale-while-revalidate=30"
+        return collector.get_public_summary_payload()
 
     @router.get("/light-status")
     async def get_light_status() -> dict:

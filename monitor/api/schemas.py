@@ -206,6 +206,40 @@ class StatusModel(BaseModel):
     price_usdt: float | None = None
 
 
+class PublicSummaryServicesModel(BaseModel):
+    overall_status: str = "unknown"
+    ok_count: int = 0
+    degraded_count: int = 0
+    down_count: int = 0
+    mining_pool_total: int = 0
+    mining_pool_up: int = 0
+    mining_pool_degraded: int = 0
+    mining_pool_down: int = 0
+
+
+class PublicSummaryFreshnessModel(BaseModel):
+    snapshot_age_seconds: int | None = None
+    snapshot_status: str = "normal"
+    last_block_status: str = "normal"
+    overall_status: str = "normal"
+
+
+class PublicSummaryModel(BaseModel):
+    generated_at: str | None = None
+    stale: bool = True
+    height: int | None = None
+    hashrate_hps: float | None = None
+    hashrate_display: str | None = None
+    difficulty: float | None = None
+    peer_count: int = 0
+    avg_block_time_8m: float | None = None
+    last_block_age_seconds: int | None = None
+    masternode_enabled: int = 0
+    masternode_total: int = 0
+    services: PublicSummaryServicesModel = Field(default_factory=PublicSummaryServicesModel)
+    freshness: PublicSummaryFreshnessModel = Field(default_factory=PublicSummaryFreshnessModel)
+
+
 class HealthModel(BaseModel):
     status: str
     cache: str
