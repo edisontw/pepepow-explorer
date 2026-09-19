@@ -134,6 +134,7 @@ MONITOR_MIN_UPGRADED_SUBVER=2.9.0.2
 ## API
 
 - `GET /monitor/api/status`
+- `GET /monitor/api/public-summary`
 - `GET /monitor/api/masternodes`
 - `GET /monitor/api/fork`
 - `GET /monitor/api/hashrate`
@@ -141,6 +142,28 @@ MONITOR_MIN_UPGRADED_SUBVER=2.9.0.2
 - `GET /monitor/api/blocks/recent`
 - `GET /monitor/api/alerts`
 - `GET /monitor/api/health`
+
+### `GET /monitor/api/public-summary`
+
+Small allowlisted payload for the public `pepepow.net` website. It is derived from the same cached
+monitor snapshot used by the dashboard and does not expose peer addresses, RPC/source-health
+details, alert internals, or comparison-node data.
+
+Fields:
+
+- `network_status`
+- `height`
+- `last_block_age_seconds`
+- `avg_block_time_seconds`
+- `hashrate_hps` / `hashrate_display`
+- `masternode_count`
+- `price_usdt`
+- `generated_at` / `updated_at`
+- `stale`
+
+The route sets browser CORS only for `https://pepepow.net`; this is intentionally route-local so
+the operator-oriented monitor endpoints are not made cross-origin readable by the main website.
+The response also advertises a short public cache lifetime.
 
 ### `GET /monitor/api/status`
 

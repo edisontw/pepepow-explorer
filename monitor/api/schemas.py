@@ -206,6 +206,20 @@ class StatusModel(BaseModel):
     price_usdt: float | None = None
 
 
+class PublicSummaryModel(BaseModel):
+    generated_at: str | None = None
+    updated_at: int | None = None
+    stale: bool = True
+    network_status: str = "unknown"
+    height: int | None = None
+    last_block_age_seconds: int | None = None
+    avg_block_time_seconds: float | None = None
+    hashrate_hps: float | None = None
+    hashrate_display: str | None = None
+    masternode_count: int = 0
+    price_usdt: float | None = None
+
+
 class HealthModel(BaseModel):
     status: str
     cache: str

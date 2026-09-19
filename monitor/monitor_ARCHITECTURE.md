@@ -364,6 +364,7 @@ Fork monitoring depends on already-collected block and summary state rather than
 Main endpoints:
 
 - `GET /monitor/api/status`
+- `GET /monitor/api/public-summary`
 - `GET /monitor/api/masternodes`
 - `GET /monitor/api/fork`
 - `GET /monitor/api/hashrate`
@@ -374,8 +375,11 @@ Main endpoints:
 
 Design intent:
 
-- `status` is the primary dashboard endpoint
-- the other endpoints expose narrower slices of the same cached state
+- `status` is the primary operator/dashboard endpoint
+- `public-summary` is a strict allowlist for external public-site consumption and must not expose
+  peer addresses, RPC credentials/status details, source-health internals, or comparison-node data
+- browser CORS for `pepepow.net` is attached only to `public-summary`, not globally
+- the other endpoints expose narrower operator-facing slices of the same cached state
 
 ## Operational Notes
 
