@@ -31,6 +31,7 @@ block content
         rank: false,
         network: false,
         status : false,
+        tier: false,
         addr: false,
         version : false,
         lastseen: false,
@@ -88,6 +89,11 @@ block content
               if (json[i]['status'] != null && json[i]['status'] != '')
                 enabled_columns.status = true;
 
+              if (/^T[1-4]$/.test(json[i]['tier']))
+                enabled_columns.tier = true;
+              else
+                json[i]['tier'] = 'unknown';
+
               if (json[i]['addr'] != null && json[i]['addr'] != '')
                 enabled_columns.addr = true;
 
@@ -128,7 +134,8 @@ block content
           { name: 'lastpaid', data: 'lastpaid', className: "lastPaidCol" },
           { name: 'last_paid_block', data: 'last_paid_block', className: "lastPaidBlockCol" },
           { name: 'activetime', data: 'activetime', className: "activeTimeCol" },
-          { name: 'status', data: 'status', className: "statusCol" }
+          { name: 'status', data: 'status', className: "statusCol" },
+          { name: 'tier', data: 'tier', defaultContent: 'unknown', className: "tierCol" }
         ],
         rowCallback: function(row, data, index) {
           $("td.addressCol", row).addClass("breakWord");
@@ -169,6 +176,7 @@ block content
             ctable.api().column('ip_address:name').visible(enabled_columns.ip_address, false);
             ctable.api().column('last_paid_block:name').visible(enabled_columns.last_paid_block, false);
             ctable.api().column('status:name').visible(enabled_columns.status, false);
+            ctable.api().column('tier:name').visible(enabled_columns.tier, false);
             ctable.api().column('addr:name').visible(enabled_columns.addr, false);
             ctable.api().column('lastpaid:name').visible(enabled_columns.lastpaid, false);
             fixDataTableColumns();
@@ -237,4 +245,5 @@ block content
             th.text-center Last paid block
             th.text-center Active since
             th.text-center Status
+            th.text-center Tier
         tbody.text-center
