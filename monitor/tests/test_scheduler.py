@@ -440,6 +440,8 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         await collector.refresh_once()
         snapshot = collector.get_status_payload()
         self.assertEqual(snapshot["masternode_tiers"]["counts"], {"T1": 2, "T2": 1, "T3": 0, "T4": 0, "unknown": 1})
+        self.assertFalse(snapshot["masternode_tiers"]["enabled_available"])
+        self.assertEqual(snapshot["masternode_tiers"]["enabled_counts"], {})
         self.assertFalse(snapshot["masternode_tiers"]["stale"])
         bowser = next(p for p in snapshot["services"]["mining_pools"] if p["host"] == "bowserlab.ddns.net")
         self.assertEqual(bowser["status"], "up")
@@ -485,6 +487,10 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(tiers["stale"])
         self.assertEqual(tiers["source"], "explorer_cache")
         self.assertEqual(tiers["counts"], {"T1": 1, "T2": 1, "T3": 1, "T4": 1, "unknown": 0})
+        self.assertTrue(tiers["enabled_available"])
+        self.assertEqual(tiers["enabled_counts"], {"T1": 0, "T2": 1, "T3": 0, "T4": 0, "unknown": 0})
+        self.assertEqual(sum(tiers["enabled_counts"].values()), 1)
+        self.assertEqual(collector.get_public_summary_payload()["masternode_tiers"]["enabled_counts"], tiers["enabled_counts"])
         self.assertEqual(sources.calls.get("rpc_get_masternodetiers", 0), 0)
 
     async def test_partial_explorer_roster_never_claims_complete_tier_counts(self):
@@ -501,6 +507,25 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         tiers = collector.get_status_payload()["masternode_tiers"]
         self.assertFalse(tiers["available"])
         self.assertEqual(tiers["counts"], {})
+        self.assertFalse(tiers["enabled_available"])
+        self.assertEqual(tiers["enabled_counts"], {})
+
+    async def test_enabled_tier_counts_rejected_if_core_enabled_count_disagrees(self):
+        sources = SpySources()
+        sources.masternode_count = {"enabled": 2, "total": 4}
+        sources.masternode_list = [
+            {**sources.masternode_list[0], "tier": "T2"},
+            {**sources.masternode_list[1], "tier": "T3"},
+            {"status": "NEW_START_REQUIRED", "tier": "T4"},
+            {"status": "POSE_BAN", "tier": "T1"},
+        ]
+        collector = MonitorCollector(build_settings(), MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        tiers = collector.get_status_payload()["masternode_tiers"]
+        self.assertTrue(tiers["available"])
+        self.assertFalse(tiers["enabled_available"])
+        self.assertEqual(tiers["enabled_counts"], {})
+        self.assertEqual(sum(tiers["counts"].values()), 4)
 
     async def _fake_tiers(self):
         return {"out-1": "T1", "out-2": "T1", "out-3": "T2", "out-4": "unknown"}
