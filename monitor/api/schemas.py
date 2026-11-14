@@ -230,6 +230,8 @@ class PublicMasternodeTiersModel(BaseModel):
     stale: bool = True
     source: str | None = None
     counts: dict[str, int] = Field(default_factory=dict)
+    enabled_available: bool = False
+    enabled_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class PublicSummaryModel(BaseModel):
