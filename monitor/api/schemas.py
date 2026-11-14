@@ -224,6 +224,12 @@ class PublicSummaryFreshnessModel(BaseModel):
     overall_status: str = "normal"
 
 
+class PublicMasternodeTiersModel(BaseModel):
+    available: bool = False
+    stale: bool = True
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
 class PublicSummaryModel(BaseModel):
     generated_at: str | None = None
     stale: bool = True
@@ -236,6 +242,7 @@ class PublicSummaryModel(BaseModel):
     last_block_age_seconds: int | None = None
     masternode_enabled: int = 0
     masternode_total: int = 0
+    masternode_tiers: PublicMasternodeTiersModel = Field(default_factory=PublicMasternodeTiersModel)
     services: PublicSummaryServicesModel = Field(default_factory=PublicSummaryServicesModel)
     freshness: PublicSummaryFreshnessModel = Field(default_factory=PublicSummaryFreshnessModel)
 

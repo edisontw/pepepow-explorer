@@ -141,6 +141,7 @@ class MiningPoolTarget:
     port: int
     name: str | None = None
     enabled: bool = True
+    probe_type: str = "stratum"  # stratum or https (web-only, not Stratum health)
 
 
 @dataclass(slots=True)
@@ -251,6 +252,7 @@ def load_settings() -> Settings:
 
     site_status_targets = [
         SiteStatusTarget(name="pepepow.org", url="https://pepepow.org"),
+        SiteStatusTarget(name="pepepow.net", url="https://pepepow.net"),
         SiteStatusTarget(name="explorer.pepepow.org", url="https://explorer.pepepow.org"),
         SiteStatusTarget(name="explorer.pepepow.net", url="https://explorer.pepepow.net"),
         SiteStatusTarget(name="wallet.pepepow.net", url="https://wallet.pepepow.net"),
@@ -283,6 +285,8 @@ def load_settings() -> Settings:
         MiningPoolTarget(host="stratum-eu.pepepow.foztor.net", port=13232, name="(foztor) stratum-eu.pepepow.foztor.net:13232"),
         MiningPoolTarget(host="pool.pepepow.net", port=39333, name="Lab — pool.pepepow.net:39333"),
         MiningPoolTarget(host="pool.pepepow.net", port=39334, name="Lab — pool.pepepow.net(SOLO):39334"),
+        # Stratum port is unverified; check only the public HTTPS endpoint.
+        MiningPoolTarget(host="bowserlab.ddns.net", port=9912, name="BowserLab — bowserlab.ddns.net:9912"),
     ]
     mining_pools_raw = os.getenv("MONITOR_MINING_POOL_TARGETS")
     if mining_pools_raw:
@@ -303,12 +307,16 @@ def load_settings() -> Settings:
                 port = None
             if port is None or port <= 0:
                 continue
+            probe_type = str(item.get("probe_type") or "stratum").strip().lower()
+            if probe_type not in {"stratum", "https"}:
+                continue
             parsed_pool_targets.append(
                 MiningPoolTarget(
                     host=host,
                     port=port,
                     name=item.get("name"),
                     enabled=bool(item.get("enabled", True)),
+                    probe_type=probe_type,
                 )
             )
         if parsed_pool_targets:

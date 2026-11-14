@@ -426,6 +426,45 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(first_snapshot["services"]["public_sites"]), 4)
         self.assertEqual(first_snapshot["services"]["public_sites"], second_snapshot["services"]["public_sites"])
 
+    async def test_tier_counts_and_https_only_pool_probe(self):
+        settings = build_settings()
+        sources = SpySources()
+        sources.rpc_get_masternodetiers = self._fake_tiers
+        settings.mining_pool_targets.append(
+            MiningPoolTarget(host="bowserlab.ddns.net", port=9912, name="BowserLab Stratum")
+        )
+        sources.mining_pool_responses["bowserlab.ddns.net:9912"] = {
+            "tcp_connect_ok": True, "stratum_ok": True, "latency_ms": 85.0, "error": None
+        }
+        collector = MonitorCollector(settings, MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        snapshot = collector.get_status_payload()
+        self.assertEqual(snapshot["masternode_tiers"]["counts"], {"T1": 2, "T2": 1, "T3": 0, "T4": 0, "unknown": 1})
+        self.assertFalse(snapshot["masternode_tiers"]["stale"])
+        bowser = next(p for p in snapshot["services"]["mining_pools"] if p["host"] == "bowserlab.ddns.net")
+        self.assertEqual(bowser["status"], "up")
+        self.assertEqual(bowser["port"], 9912)
+        self.assertEqual(bowser["probe_type"], "stratum")
+        self.assertTrue(bowser["stratum_ok"])
+        self.assertEqual(snapshot["services"]["mining_pool_summary"]["healthy_stratum_pools"], 5)
+
+    async def test_missing_tier_rpc_does_not_fabricate_counts(self):
+        sources = SpySources()
+
+        async def unsupported():
+            raise RuntimeError("unsupported tier mode")
+
+        sources.rpc_get_masternodetiers = unsupported
+        collector = MonitorCollector(build_settings(), MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        tiers = collector.get_status_payload()["masternode_tiers"]
+        self.assertFalse(tiers["available"])
+        self.assertTrue(tiers["stale"])
+        self.assertEqual(tiers["counts"], {})
+
+    async def _fake_tiers(self):
+        return {"out-1": "T1", "out-2": "T1", "out-3": "T2", "out-4": "unknown"}
+
     async def test_mining_pool_status_populates_summary_and_items(self):
         collector = MonitorCollector(build_settings(), MemoryCache(), SpySources(), logger=logging.getLogger("test"))
 

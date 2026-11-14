@@ -152,6 +152,7 @@ class MonitorCollector:
         masternode_cache_generated_at = previous_snapshot.get("_masternode_cache_generated_at")
         masternode_cache_generated_at_unix = previous_snapshot.get("_masternode_cache_generated_at_unix")
         masternode_summary_fingerprint = previous_snapshot.get("_masternode_summary_fingerprint")
+        masternode_tiers = dict(previous_snapshot.get("masternode_tiers") or {"available": False, "stale": True, "updated_at": None, "counts": {}})
         masternode_summary = {
             "enabled": int(previous_snapshot.get("masternode_enabled", 0) or 0),
             "total": int(previous_snapshot.get("masternode_total", 0) or 0),
@@ -214,6 +215,24 @@ class MonitorCollector:
                 generated_at=generated_at,
                 generated_at_unix=generated_at_unix,
             )
+
+        if tier_b_due:
+            # Optional read-only RPC, at the existing MN cadence. Never block primary collection
+            # on unsupported/slow tier queries and never count missing data as zero.
+            if self._rpc_can_call("masternodelist-tier") and hasattr(self.sources, "rpc_get_masternodetiers"):
+                try:
+                    tier_map = await asyncio.wait_for(self.sources.rpc_get_masternodetiers(), timeout=2.5)
+                    if not tier_map:
+                        raise ValueError("empty tier map")
+                    tier_counts = {tier: 0 for tier in ("T1", "T2", "T3", "T4", "unknown")}
+                    for tier in tier_map.values():
+                        tier_counts[tier if tier in tier_counts else "unknown"] += 1
+                    masternode_tiers = {"available": True, "stale": False, "updated_at": generated_at, "counts": tier_counts}
+                except Exception as exc:
+                    self.logger.warning("optional masternode tier RPC unavailable: %s", type(exc).__name__)
+                    masternode_tiers["stale"] = True
+            else:
+                masternode_tiers["stale"] = True
 
         if site_status_due:
             public_sites, site_checks_generated_at, site_checks_generated_at_unix = await self._collect_site_status(
@@ -488,6 +507,7 @@ class MonitorCollector:
             "masternode_legacy_enabled": masternode_summary["legacy_enabled"],
             "masternode_unknown_enabled": masternode_summary["unknown_enabled"],
             "masternode_versions": masternode_summary["versions"],
+            "masternode_tiers": masternode_tiers,
             "upgrade_ratio": masternode_summary["upgrade_ratio"],
             "target_version": self.settings.target_version,
             "rpc_local_status": rpc_local_status,
@@ -657,7 +677,7 @@ class MonitorCollector:
             return previous_sites, None, None
 
         results = await asyncio.gather(*tasks)
-        results.sort(key=lambda item: item["name"])
+        # Retain the configured order (including pepepow.org followed by pepepow.net).
         return results, generated_at, generated_at_unix
 
     def _build_services_summary(
@@ -717,7 +737,19 @@ class MonitorCollector:
             previous = previous_by_endpoint.get(endpoint, {})
             try:
                 async with semaphore:
-                    payload = await self.sources.check_mining_pool(target.host, target.port)
+                    if target.probe_type == "https":
+                        result = await self.sources.check_site(f"https://{target.host}/")
+                        code = result.get("status_code")
+                        http_ok = isinstance(code, int) and 200 <= code < 400
+                        payload = {
+                            "tcp_connect_ok": code is not None,
+                            "stratum_ok": False,
+                            "http_ok": http_ok,
+                            "latency_ms": result.get("latency_ms"),
+                            "error": None if http_ok else f"http {code}",
+                        }
+                    else:
+                        payload = await self.sources.check_mining_pool(target.host, target.port)
             except Exception as exc:
                 payload = {
                     "tcp_connect_ok": False,
@@ -728,7 +760,7 @@ class MonitorCollector:
 
             tcp_connect_ok = bool(payload.get("tcp_connect_ok"))
             stratum_ok = bool(payload.get("stratum_ok"))
-            if stratum_ok:
+            if stratum_ok or (target.probe_type == "https" and payload.get("http_ok")):
                 status = "up"
             elif tcp_connect_ok:
                 status = "degraded"
@@ -739,13 +771,14 @@ class MonitorCollector:
                 "endpoint": endpoint,
                 "host": target.host,
                 "port": int(target.port),
+                "probe_type": target.probe_type,
                 "tcp_connect_ok": tcp_connect_ok,
                 "stratum_ok": stratum_ok,
                 "latency_ms": payload.get("latency_ms"),
                 "checked_at": generated_at,
-                "last_ok_at": generated_at if stratum_ok else previous.get("last_ok_at"),
+                "last_ok_at": generated_at if status == "up" else previous.get("last_ok_at"),
                 "status": status,
-                "error": None if stratum_ok else payload.get("error"),
+                "error": None if status == "up" else payload.get("error"),
             }
 
         tasks = [probe(target) for target in self.settings.mining_pool_targets if target.enabled]
@@ -1495,6 +1528,7 @@ class MonitorCollector:
             "masternode_legacy_enabled": 0,
             "masternode_unknown_enabled": 0,
             "masternode_versions": [],
+            "masternode_tiers": {"available": False, "stale": True, "updated_at": None, "counts": {}},
             "upgrade_ratio": 0.0,
             "target_version": self.settings.target_version,
             "rpc_local_status": "ok",
@@ -1667,6 +1701,14 @@ class MonitorCollector:
             ),
             "masternode_enabled": int(snapshot.get("masternode_enabled") or 0),
             "masternode_total": int(snapshot.get("masternode_total") or 0),
+            "masternode_tiers": {
+                "available": bool((snapshot.get("masternode_tiers") or {}).get("available")),
+                "stale": bool((snapshot.get("masternode_tiers") or {}).get("stale", True)),
+                "counts": {
+                    tier: int(((snapshot.get("masternode_tiers") or {}).get("counts") or {}).get(tier, 0))
+                    for tier in ("T1", "T2", "T3", "T4", "unknown")
+                } if (snapshot.get("masternode_tiers") or {}).get("available") else {},
+            },
             "services": {
                 "overall_status": services_summary.get("overall_status", "unknown"),
                 "ok_count": int(services_summary.get("ok_count") or 0),

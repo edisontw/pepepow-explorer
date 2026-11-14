@@ -36,6 +36,21 @@ block content
     else
       var displayLengthMax = setting_txPerPage;
     $(document).ready(function() {
+      $.getJSON("/monitor/api/public-summary").done(function(summary) {
+        var tiers = summary && summary.masternode_tiers;
+        if (!tiers || !tiers.available || tiers.stale) {
+          $("#home-tier-summary").text("Tier information currently unavailable");
+          return;
+        }
+        var counts = tiers.counts || {};
+        var labels = ["T1", "T2", "T3", "T4", "unknown"].map(function(tier) {
+          var n = Number(counts[tier]);
+          return (tier === "unknown" ? "Unknown" : tier) + ": " + (Number.isFinite(n) && n >= 0 ? n.toLocaleString("en") : "-");
+        });
+        $("#home-tier-summary").text("All known nodes | " + labels.join("  |  "));
+      }).fail(function() {
+        $("#home-tier-summary").text("Tier information currently unavailable");
+      });
       var rtable = $('#recent-table').dataTable({
         autoWidth: false,
         searching: false,
@@ -164,6 +179,12 @@ block content
             else
               .sub-page-header.text-muted=settings.localization.ex_description.replace('{1}', settings.coin.name)
       .cardSpacer.clearfix
+    .card.card-default.border-0.cardSpacer
+      .card-header
+        strong Masternode Collateral Tiers
+        a.float-end(href="/masternodes") View masternodes
+      .card-body
+        #home-tier-summary.text-muted Loading cached Tier information…
     .card.card-default.border-0.cardSpacer
       .card-header
         strong #{settings.localization.ex_latest_transactions}
