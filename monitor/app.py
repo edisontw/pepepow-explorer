@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 from collections import defaultdict, deque
@@ -47,7 +48,22 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("monitor")
 
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "ui" / "templates"))
+_UI_DIR = Path(__file__).resolve().parent / "ui"
+
+
+def _asset_revision() -> str:
+    """Content-address static assets so browser caching cannot retain outdated Monitor JS."""
+    digest = hashlib.sha256()
+    for name in ("monitor.js", "monitor-tuning.js", "monitor-light.js", "monitor.css", "monitor-tuning.css"):
+        path = _UI_DIR / "static" / name
+        if path.exists():
+            digest.update(name.encode("utf-8"))
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
+
+asset_version = _asset_revision()
+templates = Jinja2Templates(directory=str(_UI_DIR / "templates"))
 cache = build_cache(settings, logger)
 sources = MonitorSources(settings)
 collector = MonitorCollector(settings, cache, sources, logger)
@@ -91,7 +107,8 @@ async def dashboard(request: Request):
         request=request,
         title=settings.title,
         root_path=settings.root_path.rstrip("/"),
+        asset_version=asset_version,
     )
-    light_script = f'<script src="{settings.root_path.rstrip("/")}/static/monitor-light.js" defer></script>'
+    light_script = f'<script src="{settings.root_path.rstrip("/")}/static/monitor-light.js?v={asset_version}" defer></script>'
     html = html.replace("</body>", f"  {light_script}\n  </body>")
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, must-revalidate"})

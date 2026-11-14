@@ -61,10 +61,10 @@ class AggregationTests(unittest.TestCase):
             {"status": "NEW_START_REQUIRED", "ip_address": "203.0.113.13:8833", "version": 70521},
         ]
         summary = build_masternode_summary(masternodes, {"enabled": 4, "total": 5}, "2.9.0.2", peers)
-        self.assertEqual(summary["upgraded_enabled"], 2)
+        self.assertEqual(summary["upgraded_enabled"], 1)
         self.assertEqual(summary["legacy_enabled"], 2)
-        self.assertEqual(summary["unknown_enabled"], 0)
-        self.assertAlmostEqual(summary["upgrade_ratio"], 0.5, places=4)
+        self.assertEqual(summary["unknown_enabled"], 1)
+        self.assertAlmostEqual(summary["upgrade_ratio"], 0.25, places=4)
         self.assertEqual(
             summary["versions"],
             [
@@ -72,8 +72,15 @@ class AggregationTests(unittest.TestCase):
                     "protocol_version": 70521,
                     "display_version": "70521",
                     "semver": "2.9.0.2",
-                    "count": 2,
+                    "count": 1,
                     "is_upgraded": True,
+                },
+                {
+                    "protocol_version": 70521,
+                    "display_version": "70521",
+                    "semver": None,
+                    "count": 1,
+                    "is_upgraded": None,
                 },
                 {
                     "protocol_version": 70520,
@@ -91,6 +98,38 @@ class AggregationTests(unittest.TestCase):
                 },
             ],
         )
+
+    def test_70521_does_not_imply_core_2_9_0_5_or_2_9_0_6(self):
+        peers = [
+            {"addr": "203.0.113.10:8833", "version": 70521, "subver": "/PEPEPOW Core:2.9.0.5/"},
+            {"addr": "203.0.113.11:8833", "version": 70521, "subver": "/PEPEPOW Core:2.9.0.6/"},
+        ]
+        nodes = [
+            {"status": "ENABLED", "ip_address": "203.0.113.10:8833", "version": 70521},
+            {"status": "ENABLED", "ip_address": "203.0.113.11:8833", "version": 70521},
+            {"status": "ENABLED", "ip_address": "203.0.113.12:8833", "version": 70521},
+        ]
+        summary = build_masternode_summary(nodes, {"enabled": 3, "total": 3}, "2.9.0.6", peers)
+        by_version = {entry["semver"]: entry for entry in summary["versions"]}
+        self.assertEqual(by_version["2.9.0.5"]["count"], 1)
+        self.assertFalse(by_version["2.9.0.5"]["is_upgraded"])
+        self.assertEqual(by_version["2.9.0.6"]["count"], 1)
+        self.assertTrue(by_version["2.9.0.6"]["is_upgraded"])
+        self.assertEqual(by_version[None]["count"], 1)
+        self.assertIsNone(by_version[None]["is_upgraded"])
+        self.assertEqual(summary["unknown_enabled"], 1)
+
+    def test_single_peer_subver_never_applies_to_unmatched_nodes(self):
+        peers = [{"addr": "203.0.113.10:8833", "version": 70521, "subver": "/PEPEPOW Core:2.9.0.5/"}]
+        nodes = [
+            {"status": "ENABLED", "ip_address": f"203.0.113.{host}:8833", "version": 70521}
+            for host in range(10, 65)
+        ]
+        summary = build_masternode_summary(nodes, {"enabled": 55, "total": 55}, "2.9.0.2", peers)
+        by_version = {entry["semver"]: entry for entry in summary["versions"]}
+        self.assertEqual(by_version["2.9.0.5"]["count"], 1)
+        self.assertEqual(by_version[None]["count"], 54)
+        self.assertEqual(summary["unknown_enabled"], 54)
 
     def test_pre_enabled_is_not_counted_as_enabled(self):
         nodes = [

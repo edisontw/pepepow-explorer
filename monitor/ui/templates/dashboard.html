@@ -4,11 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title }}</title>
-    <link rel="stylesheet" href="{{ root_path }}/static/monitor.css" />
-    <link rel="stylesheet" href="{{ root_path }}/static/monitor-tuning.css" />
+    <link rel="stylesheet" href="{{ root_path }}/static/monitor.css?v={{ asset_version }}" />
+    <link rel="stylesheet" href="{{ root_path }}/static/monitor-tuning.css?v={{ asset_version }}" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
-    <script src="{{ root_path }}/static/monitor.js" defer></script>
-    <script src="{{ root_path }}/static/monitor-tuning.js" defer></script>
+    <script src="{{ root_path }}/static/monitor.js?v={{ asset_version }}" defer></script>
+    <script src="{{ root_path }}/static/monitor-tuning.js?v={{ asset_version }}" defer></script>
   </head>
   <body data-root-path="{{ root_path }}">
     <main class="shell">
@@ -128,27 +128,28 @@
           <div class="inline-panel-section">
             <div class="panel-heading compact-heading">
               <h3>Collateral Tiers — All Known Nodes</h3>
-              <span class="panel-kicker" id="mn-tier-freshness">Core RPC · unavailable</span>
+              <span class="panel-kicker" id="mn-tier-freshness">Waiting for tier snapshot…</span>
             </div>
             <div class="metric-grid">
               <div class="metric"><span class="label">T1 · 10M</span><strong id="mn-tier-t1">-</strong></div>
               <div class="metric"><span class="label">T2 · 25M</span><strong id="mn-tier-t2">-</strong></div>
               <div class="metric"><span class="label">T3 · 50M</span><strong id="mn-tier-t3">-</strong></div>
               <div class="metric"><span class="label">T4 · 100M</span><strong id="mn-tier-t4">-</strong></div>
-              <div class="metric"><span class="label">Unknown</span><strong id="mn-tier-unknown">-</strong></div>
+              <div class="metric" id="mn-tier-unknown-container" style="display:none"><span class="label">Unclassified</span><strong id="mn-tier-unknown">-</strong></div>
             </div>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Version</th>
-                  <th>Semver</th>
+                  <th>Protocol</th>
+                  <th>Core version (observed)</th>
                   <th>Enabled nodes</th>
                 </tr>
               </thead>
               <tbody id="mn-version-breakdown"></tbody>
             </table>
+            <p class="meta-relative">One protocol number may include multiple Core releases. Unobserved versions are not inferred from unrelated peers; “Compatible” means meeting the configured minimum, not the newest release.</p>
           </div>
 
           <div id="reward-estimate-panel" class="inline-panel-section">
