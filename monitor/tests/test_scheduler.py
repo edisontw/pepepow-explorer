@@ -462,6 +462,46 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(tiers["stale"])
         self.assertEqual(tiers["counts"], {})
 
+    async def test_verified_full_explorer_roster_is_used_when_direct_rpc_fails(self):
+        sources = SpySources()
+        offline = [
+            {"addr": "PEPEW789", "txhash": "cd" * 32, "outidx": 1, "status": "NEW_START_REQUIRED", "tier": "T4"},
+            {"addr": "PEPEW012", "txhash": "ef" * 32, "outidx": 1, "status": "POSE_BAN", "tier": "T1"},
+        ]
+        sources.masternode_list = [
+            {**sources.masternode_list[0], "tier": "T2"},
+            {**sources.masternode_list[1], "tier": "T3"},
+            *offline,
+        ]
+
+        async def unsupported():
+            raise RuntimeError("RPC not reachable")
+
+        sources.rpc_get_masternodetiers = unsupported
+        collector = MonitorCollector(build_settings(), MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        tiers = collector.get_status_payload()["masternode_tiers"]
+        self.assertTrue(tiers["available"])
+        self.assertFalse(tiers["stale"])
+        self.assertEqual(tiers["source"], "explorer_cache")
+        self.assertEqual(tiers["counts"], {"T1": 1, "T2": 1, "T3": 1, "T4": 1, "unknown": 0})
+        self.assertEqual(sources.calls.get("rpc_get_masternodetiers", 0), 0)
+
+    async def test_partial_explorer_roster_never_claims_complete_tier_counts(self):
+        sources = SpySources()
+        sources.masternode_list[0]["tier"] = "T1"
+        sources.masternode_list[1]["tier"] = "T4"
+
+        async def unsupported():
+            raise RuntimeError("RPC not reachable")
+
+        sources.rpc_get_masternodetiers = unsupported
+        collector = MonitorCollector(build_settings(), MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        tiers = collector.get_status_payload()["masternode_tiers"]
+        self.assertFalse(tiers["available"])
+        self.assertEqual(tiers["counts"], {})
+
     async def _fake_tiers(self):
         return {"out-1": "T1", "out-2": "T1", "out-3": "T2", "out-4": "unknown"}
 

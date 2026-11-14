@@ -184,6 +184,7 @@ class StatusModel(BaseModel):
     masternode_legacy_enabled: int = 0
     masternode_unknown_enabled: int = 0
     masternode_versions: list[MasternodeVersionModel] = []
+    masternode_tiers: dict[str, Any] = Field(default_factory=dict)
     upgrade_ratio: float = 0.0
     target_version: str | None = None
     rpc_local_status: str = "ok"
@@ -227,6 +228,7 @@ class PublicSummaryFreshnessModel(BaseModel):
 class PublicMasternodeTiersModel(BaseModel):
     available: bool = False
     stale: bool = True
+    source: str | None = None
     counts: dict[str, int] = Field(default_factory=dict)
 
 

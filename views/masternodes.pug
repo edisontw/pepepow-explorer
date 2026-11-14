@@ -121,6 +121,22 @@ block content
               }
             }
 
+            // Explain the difference between total Core-registered nodes and
+            // currently ENABLED nodes; offline statuses are intentionally listed.
+            var statusCounts = {};
+            for (var n = 0; n < json.length; n++) {
+              var state = String(json[n]['status'] || 'UNKNOWN').toUpperCase();
+              statusCounts[state] = (statusCounts[state] || 0) + 1;
+            }
+            var orderedStates = ['ENABLED', 'PRE_ENABLED', 'NEW_START_REQUIRED', 'POSE_BAN', 'POSE_BANNED', 'EXPIRED', 'WATCHDOG_EXPIRED'];
+            var stateNames = Object.keys(statusCounts).sort(function(a, b) {
+              var ai = orderedStates.indexOf(a), bi = orderedStates.indexOf(b);
+              if (ai < 0) ai = orderedStates.length;
+              if (bi < 0) bi = orderedStates.length;
+              return ai === bi ? a.localeCompare(b) : ai - bi;
+            });
+            $('#masternode-status-summary').text('Core-known nodes: ' + json.length + ' · ' +
+              stateNames.map(function(state) { return state + ' ' + statusCounts[state]; }).join(' · '));
             return json;
           }
         },
@@ -152,6 +168,7 @@ block content
             case 'WATCHDOG_EXPIRED':
             case 'NEW_START_REQUIRED':
             case 'UPDATE_REQUIRED':
+            case 'POSE_BAN':
             case 'POSE_BANNED':
               $("td.statusCol", row).addClass('table-warning');
               break;
@@ -229,6 +246,9 @@ block content
     .card.card-default.border-0.cardSpacer
       .card-header
         strong Masternode List
+      .card-body.py-2
+        p#masternode-status-summary.text-muted.mb-1 Loading registered masternode statuses...
+        small.text-muted Includes offline nodes still registered in Core, even when their last ping was more than 24 hours ago.
       table#masternodes-table.table.table-bordered.table-striped.table-paging.table-hover
         - var theadClasses = [];
         if settings.shared_pages.table_header_bgcolor != null && settings.shared_pages.table_header_bgcolor != ''

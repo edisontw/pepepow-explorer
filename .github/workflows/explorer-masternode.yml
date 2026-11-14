@@ -1,0 +1,58 @@
+name: Explorer masternode sync tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/sync.js'
+      - 'lib/sync.js'
+      - 'lib/database.js'
+      - 'lib/masternode-snapshot.js'
+      - 'views/masternodes.pug'
+      - 'test/masternodeSnapshotSpec.js'
+      - '.github/workflows/explorer-masternode.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'scripts/sync.js'
+      - 'lib/sync.js'
+      - 'lib/database.js'
+      - 'lib/masternode-snapshot.js'
+      - 'views/masternodes.pug'
+      - 'test/masternodeSnapshotSpec.js'
+      - '.github/workflows/explorer-masternode.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  masternode-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify production entrypoints
+        run: |
+          node --check scripts/sync.js
+          node --check lib/sync.js
+          node --check lib/database.js
+          node --check lib/masternode-snapshot.js
+          node --check monitor/ui/static/monitor.js
+
+      - name: Install isolated Jasmine and Pug tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/explorer-test-tools" --ignore-scripts --no-fund --no-audit jasmine@5.4.0 pug@3.0.2
+
+      - name: Run focused snapshot safety tests
+        run: |
+          node "$RUNNER_TEMP/explorer-test-tools/node_modules/jasmine/bin/jasmine.js" test/masternodeSnapshotSpec.js
+
+      - name: Compile changed Pug template
+        run: |
+          NODE_PATH="$RUNNER_TEMP/explorer-test-tools/node_modules" node -e "require('pug').compileFile('views/masternodes.pug')"
