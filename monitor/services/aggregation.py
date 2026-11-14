@@ -183,7 +183,8 @@ def build_masternode_summary(
     peers: list[dict[str, Any]],
 ) -> dict[str, Any]:
     enabled_nodes = [item for item in masternodes if is_enabled_masternode(item)]
-    protocol_semver_map = _build_protocol_semver_map(peers)
+    # Protocol 70521 is shared by several Core releases (e.g. 2.9.0.5/2.9.0.6).
+    # Only a node's own reported version or a matching peer IP is evidence.
     ip_semver_map = _build_ip_semver_map(peers)
     buckets: dict[tuple[int | None, str | None], dict[str, Any]] = {}
     upgraded_enabled = 0
@@ -192,13 +193,6 @@ def build_masternode_summary(
 
     for masternode in enabled_nodes:
         protocol_version, semver = resolve_masternode_version(masternode, ip_semver_map)
-        
-        # If semver is still None, but there's a unique semver for this protocol_version in peerinfo:
-        if semver is None and protocol_version in protocol_semver_map:
-            candidates = list(set(protocol_semver_map[protocol_version]))
-            if len(candidates) == 1:
-                semver = candidates[0]
-
         key = (protocol_version, semver)
         bucket = buckets.setdefault(
             key,
@@ -206,16 +200,9 @@ def build_masternode_summary(
                 "protocol_version": protocol_version,
                 "semver": semver,
                 "count": 0,
-                "semver_candidates": [],
-                "fallback_semvers": [],
             },
         )
         bucket["count"] += 1
-        if semver:
-            bucket["fallback_semvers"].append(semver)
-        if protocol_version in protocol_semver_map:
-            bucket["semver_candidates"].extend(protocol_semver_map[protocol_version])
-
     enabled_total = normalize_int((masternode_count or {}).get("enabled")) or len(enabled_nodes)
     total = normalize_int((masternode_count or {}).get("total")) or len(masternodes)
     versions = _build_structured_version_buckets(buckets, minimum_subver)
@@ -403,7 +390,7 @@ def _build_structured_version_buckets(
     structured: list[dict[str, Any]] = []
 
     for (protocol_version, semver), bucket in buckets.items():
-        evidence_labels = [semver] if semver else (list(bucket["semver_candidates"]) + list(bucket["fallback_semvers"]))
+        evidence_labels = [semver] if semver else []
         is_upgraded = classify_semver_evidence(evidence_labels, minimum_subver)
         display_version = "unknown" if protocol_version is None else str(protocol_version)
 
