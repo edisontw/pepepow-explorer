@@ -355,13 +355,19 @@ function renderPeerSummary(peers) {
 
 function renderMasternodeTiers(snapshot) {
   const tierSummary = snapshot.masternode_tiers || {};
-  const tierCounts = tierSummary.counts || {};
-  // Preserve the last verified server-rendered counts if a live update fails.
-  // A stale but complete tier cache is still useful when visibly labelled stale.
+  const allCounts = tierSummary.counts || {};
+  const tierCounts = tierSummary.enabled_counts || {};
+  // The full roster and ENABLED subset must independently reconcile.
+  // Never display global collateral tier totals as ENABLED counts.
   const tierKeys = ["T1", "T2", "T3", "T4", "unknown"];
+  const validCounts = (counts) =>
+    tierKeys.every((key) => Number.isSafeInteger(counts[key]) && counts[key] >= 0);
   const tierHasCounts = tierSummary.available === true &&
-    tierKeys.every((key) => Number.isSafeInteger(tierCounts[key]) && tierCounts[key] >= 0) &&
-    tierKeys.reduce((sum, key) => sum + tierCounts[key], 0) === Number(snapshot.masternode_total);
+    tierSummary.enabled_available === true &&
+    validCounts(allCounts) && validCounts(tierCounts) &&
+    tierKeys.reduce((sum, key) => sum + allCounts[key], 0) === Number(snapshot.masternode_total) &&
+    tierKeys.reduce((sum, key) => sum + tierCounts[key], 0) === Number(snapshot.masternode_enabled) &&
+    tierKeys.every((key) => tierCounts[key] <= allCounts[key]);
   if (tierHasCounts) {
     const unclassifiedContainer = byId("mn-tier-unknown-container");
     if (unclassifiedContainer) {
