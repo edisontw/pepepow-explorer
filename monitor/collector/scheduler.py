@@ -223,9 +223,14 @@ class MonitorCollector:
             # A partial (e.g. 56/311) cache must never masquerade as all nodes.
             tier_counts = self._verified_explorer_tier_counts(masternode_summary["total"])
             if tier_counts is not None:
+                enabled_counts = self._verified_explorer_enabled_tier_counts(
+                    masternode_summary["total"], masternode_summary["enabled"]
+                )
                 masternode_tiers = {
                     "available": True, "stale": False, "source": "explorer_cache",
                     "updated_at": generated_at, "counts": tier_counts,
+                    "enabled_available": enabled_counts is not None,
+                    "enabled_counts": enabled_counts if enabled_counts is not None else {},
                 }
             elif self._rpc_can_call("masternodelist-tier") and hasattr(self.sources, "rpc_get_masternodetiers"):
                 try:
@@ -239,6 +244,7 @@ class MonitorCollector:
                     masternode_tiers = {
                         "available": True, "stale": False, "source": "core_rpc",
                         "updated_at": generated_at, "counts": counts,
+                        "enabled_available": False, "enabled_counts": {},
                     }
                 except Exception as exc:
                     self.logger.warning("optional masternode tier RPC unavailable: %s", type(exc).__name__)
@@ -650,6 +656,27 @@ class MonitorCollector:
                 return None
             counts[tier] += 1
         return counts
+
+    def _verified_explorer_enabled_tier_counts(
+        self, expected_total: int, expected_enabled: int
+    ) -> dict[str, int] | None:
+        """Count ENABLED tiers only after verifying the whole Explorer roster.
+
+        Do not infer enabled counts from the global tier RPC: it has no statuses.
+        """
+        items = self._latest_explorer_tier_items
+        if expected_total <= 0 or expected_enabled < 0 or len(items) != expected_total:
+            return None
+        counts = {tier: 0 for tier in ("T1", "T2", "T3", "T4", "unknown")}
+        for item in items:
+            if not isinstance(item, dict) or item.get("tier") not in counts:
+                return None
+            status = item.get("status")
+            if not isinstance(status, str) or not status.strip():
+                return None
+            if status.strip().upper() == "ENABLED":
+                counts[item["tier"]] += 1
+        return counts if sum(counts.values()) == expected_enabled else None
 
     async def _collect_site_status(
         self,
@@ -1737,6 +1764,11 @@ class MonitorCollector:
                     tier: int(((snapshot.get("masternode_tiers") or {}).get("counts") or {}).get(tier, 0))
                     for tier in ("T1", "T2", "T3", "T4", "unknown")
                 } if (snapshot.get("masternode_tiers") or {}).get("available") else {},
+                "enabled_available": bool((snapshot.get("masternode_tiers") or {}).get("enabled_available")),
+                "enabled_counts": {
+                    tier: int(((snapshot.get("masternode_tiers") or {}).get("enabled_counts") or {}).get(tier, 0))
+                    for tier in ("T1", "T2", "T3", "T4", "unknown")
+                } if (snapshot.get("masternode_tiers") or {}).get("enabled_available") else {},
             },
             "services": {
                 "overall_status": services_summary.get("overall_status", "unknown"),
