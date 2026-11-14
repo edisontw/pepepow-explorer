@@ -359,6 +359,13 @@ function renderMasternodes(snapshot) {
   setText("mn-upgraded", formatNumber(snapshot.masternode_upgraded_enabled));
   setText("mn-legacy", formatNumber(snapshot.masternode_legacy_enabled));
   setText("mn-upgrade-ratio", formatPercent(snapshot.upgrade_ratio));
+  const tierSummary = snapshot.masternode_tiers || {};
+  const tierCounts = tierSummary.counts || {};
+  const tierReady = tierSummary.available && !tierSummary.stale;
+  for (const tier of ["T1", "T2", "T3", "T4", "unknown"]) {
+    setText(`mn-tier-${tier.toLowerCase()}`, tierReady ? formatNumber(tierCounts[tier]) : "-");
+  }
+  setText("mn-tier-freshness", tierReady ? "Core RPC · latest" : (tierSummary.available ? "Core RPC · stale" : "Core RPC · unavailable"));
 
   const compatDiv = byId("mn-compatibility-summary");
   if (compatDiv) {
@@ -495,7 +502,7 @@ function renderMiningPools(services) {
   const pools = services.mining_pools || [];
   container.innerHTML = `
     <div class="metric-grid summary-grid">
-      <div class="metric"><span class="label">Reachable pools</span><strong>${formatNumber(summary.reachable_pools || 0)}</strong></div>
+      <div class="metric"><span class="label">Reachable endpoints</span><strong>${formatNumber(summary.reachable_pools || 0)}</strong></div>
       <div class="metric"><span class="label">Healthy stratum pools</span><strong>${formatNumber(summary.healthy_stratum_pools || 0)}</strong></div>
     </div>
   `;
@@ -504,7 +511,7 @@ function renderMiningPools(services) {
   pools.forEach((pool) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${escapeHtml(pool.endpoint || `${pool.host || "-"}:${pool.port ?? "-"}`)}</td>
+      <td>${escapeHtml(pool.endpoint || `${pool.host || "-"}:${pool.port ?? "-"}`)} <small>(${pool.probe_type === "https" ? "HTTPS only" : "Stratum"})</small></td>
       <td><span class="version-tag ${miningPoolTagClass(pool.status)}">${escapeHtml(pool.status || "unknown")}</span></td>
       <td>${formatLatencyMs(pool.latency_ms)}</td>
       <td>${pool.last_ok_at ? `${formatRelativeTime(pool.last_ok_at)} (${formatAbsoluteUtc(pool.last_ok_at)})` : "-"}</td>
@@ -775,6 +782,7 @@ function renderSnapshot(snapshot) {
     snapshot.masternode_unknown_enabled,
     snapshot.upgrade_ratio,
     snapshot.masternode_versions || [],
+    snapshot.masternode_tiers || {},
   ]);
   if (masternodesKey !== lastSectionKeys.masternodes) {
     renderMasternodes(snapshot);

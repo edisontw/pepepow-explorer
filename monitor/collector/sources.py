@@ -117,6 +117,16 @@ class MonitorSources:
         )
         return self._normalize_masternode_list(payload)
 
+    async def rpc_get_masternodetiers(self) -> dict[str, str]:
+        """Read-only Core v2.9.0.6 masternodelist tier; never expose RPC directly."""
+        payload = await self.rpc_call("masternodelist", ["tier"], timeout_seconds=2.0)
+        if not isinstance(payload, dict):
+            raise RuntimeError("invalid masternodelist tier payload")
+        return {
+            str(outpoint): str(tier).strip().upper() if str(tier).strip().upper() in {"T1", "T2", "T3", "T4"} else "unknown"
+            for outpoint, tier in payload.items()
+        }
+
     async def explorer_get_blockcount(self) -> int:
         response = await self.http_client.get(f"{self.settings.explorer_base_url}/api/getblockcount")
         response.raise_for_status()

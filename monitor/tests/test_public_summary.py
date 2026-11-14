@@ -24,6 +24,7 @@ PUBLIC_TOP_LEVEL_KEYS = {
     "last_block_age_seconds",
     "masternode_enabled",
     "masternode_total",
+    "masternode_tiers",
     "services",
     "freshness",
 }
@@ -43,6 +44,7 @@ class StubCollector:
             "last_block_age_seconds": 9,
             "masternode_enabled": 42,
             "masternode_total": 45,
+            "masternode_tiers": {"available": True, "stale": False, "counts": {"T1": 10, "T2": 8, "T3": 7, "T4": 6, "unknown": 14}},
             "services": {
                 "overall_status": "ok",
                 "ok_count": 6,
@@ -117,6 +119,8 @@ class PublicSummaryCollectorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("alerts", payload)
         self.assertNotIn("peers", payload)
         self.assertNotIn("masternode_versions", payload)
+        self.assertIn("masternode_tiers", payload)
+        self.assertFalse(payload["masternode_tiers"]["available"])
 
 
 if __name__ == "__main__":

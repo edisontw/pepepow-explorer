@@ -167,6 +167,7 @@ Primary dashboard payload. This endpoint is intended to be cheap:
 
 Important fields:
 
+- `masternode_tiers`: read-only `masternodelist tier` summary (T1/T2/T3/T4/unknown) of **all known nodes**, not enabled-only; optional RPC failure shows unavailable/stale, never fabricated zeros
 - `avg_block_time_8m`
 - `avg_block_time_5m`
   - compatibility alias populated with the same 8-minute value
@@ -270,3 +271,11 @@ See:
 - If local RPC starts causing CPU spikes, keep `monitor.service` disabled and test with manual `systemctl start`; the scheduler already enters RPC cooldown after repeated failures and skips heavier RPC methods unless their interval is due.
 - Masternode version buckets classify as upgraded / legacy / unknown. Mixed evidence such as `2.9.0.x` remains `unknown` instead of being forced into legacy.
 - High host CPU is not automatically a monitor problem. In recent inspection, heavier CPU consumers were mainly `PEPEPOWd`, multiple `node` processes, and `mongod`, while `uvicorn` stayed comparatively low.
+
+### Core v2.9.0.6 Tier and BowserLab checks
+
+The Masternode Tier counters use an optional private `masternodelist tier` RPC on the existing 60-second Masternode schedule. The public monitor endpoint only exposes aggregate tier counts; the privileged RPC itself remains local. A slow, missing or unsupported mode leaves the Tier section unavailable/stale rather than pretending zero nodes.
+
+Default Public Sites additionally checks `https://pepepow.net` after `pepepow.org`. Default Mining Pools additionally checks `stratum+tcp://bowserlab.ddns.net:9912` using the same TCP and Stratum protocol probe as the other pools. Custom `MONITOR_SITE_STATUS_TARGETS` and `MONITOR_MINING_POOL_TARGETS` fully override defaults; update local `.env` accordingly if these variables are in use.
+
+The cached `/monitor/api/public-summary` also exposes an aggregate-only `masternode_tiers` object for the Explorer homepage. It never exposes raw collateral outpoints or wallet RPC credentials.
