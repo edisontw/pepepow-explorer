@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from monitor.api.routes import build_router
+from monitor.api.schemas import StatusModel
 from monitor.cache.memory import MemoryCache
 from monitor.collector.scheduler import MonitorCollector
 from monitor.tests.test_scheduler import SpyCache, SpySources, build_settings
@@ -62,6 +63,18 @@ class StubCollector:
                 "overall_status": "normal",
             },
         }
+
+
+class StatusSchemaTierTests(unittest.TestCase):
+    def test_tier_counts_survive_status_response_validation(self):
+        model = StatusModel.model_validate({
+            "masternode_tiers": {
+                "available": True, "stale": False, "source": "explorer_cache",
+                "counts": {"T1": 180, "T2": 11, "T3": 14, "T4": 106, "unknown": 0},
+            }
+        })
+        self.assertEqual(model.model_dump()["masternode_tiers"]["counts"]["T4"], 106)
+        self.assertEqual(model.model_dump()["masternode_tiers"]["source"], "explorer_cache")
 
 
 class PublicSummaryRouteTests(unittest.TestCase):
