@@ -153,7 +153,12 @@ class MonitorCollector:
         masternode_cache_generated_at = previous_snapshot.get("_masternode_cache_generated_at")
         masternode_cache_generated_at_unix = previous_snapshot.get("_masternode_cache_generated_at_unix")
         masternode_summary_fingerprint = previous_snapshot.get("_masternode_summary_fingerprint")
-        masternode_tiers = dict(previous_snapshot.get("masternode_tiers") or {"available": False, "stale": True, "updated_at": None, "counts": {}})
+        masternode_tiers = dict(previous_snapshot.get("masternode_tiers") or {
+            "available": False, "stale": True, "updated_at": None,
+            "counts": {}, "enabled_available": False, "enabled_counts": {},
+        })
+        masternode_tiers.setdefault("enabled_available", False)
+        masternode_tiers.setdefault("enabled_counts", {})
         masternode_summary = {
             "enabled": int(previous_snapshot.get("masternode_enabled", 0) or 0),
             "total": int(previous_snapshot.get("masternode_total", 0) or 0),
@@ -1583,7 +1588,10 @@ class MonitorCollector:
             "masternode_legacy_enabled": 0,
             "masternode_unknown_enabled": 0,
             "masternode_versions": [],
-            "masternode_tiers": {"available": False, "stale": True, "source": None, "updated_at": None, "counts": {}},
+            "masternode_tiers": {
+                "available": False, "stale": True, "source": None, "updated_at": None,
+                "counts": {}, "enabled_available": False, "enabled_counts": {},
+            },
             "upgrade_ratio": 0.0,
             "target_version": self.settings.target_version,
             "rpc_local_status": "ok",
