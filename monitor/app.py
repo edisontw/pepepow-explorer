@@ -18,6 +18,7 @@ from monitor.cache import build_cache
 from monitor.collector.scheduler import MonitorCollector
 from monitor.collector.sources import MonitorSources
 from monitor.config import load_settings
+from monitor.ui.tier_presentation import build_tier_display
 
 
 class RateLimiter:
@@ -103,11 +104,15 @@ async def apply_rate_limit(request: Request, call_next):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     template = templates.get_template("dashboard.html")
+    # Render last verified tier counts into HTML before browser JS starts.
+    # Uses only the collector's cached snapshot; never triggers a Core RPC.
+    tier_display = build_tier_display(collector.get_public_summary_payload())
     html = template.render(
         request=request,
         title=settings.title,
         root_path=settings.root_path.rstrip("/"),
         asset_version=asset_version,
+        tier_display=tier_display,
     )
     light_script = f'<script src="{settings.root_path.rstrip("/")}/static/monitor-light.js?v={asset_version}" defer></script>'
     html = html.replace("</body>", f"  {light_script}\n  </body>")
