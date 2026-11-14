@@ -365,7 +365,8 @@ function renderMasternodes(snapshot) {
   for (const tier of ["T1", "T2", "T3", "T4", "unknown"]) {
     setText(`mn-tier-${tier.toLowerCase()}`, tierReady ? formatNumber(tierCounts[tier]) : "-");
   }
-  setText("mn-tier-freshness", tierReady ? "Core RPC · latest" : (tierSummary.available ? "Core RPC · stale" : "Core RPC · unavailable"));
+  const tierSource = tierSummary.source === "explorer_cache" ? "Explorer cache" : "Core RPC";
+  setText("mn-tier-freshness", tierReady ? `${tierSource} · latest` : (tierSummary.available ? `${tierSource} · stale` : "Core RPC / Explorer cache · unavailable"));
 
   const compatDiv = byId("mn-compatibility-summary");
   if (compatDiv) {
