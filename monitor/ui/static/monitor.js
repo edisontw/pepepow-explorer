@@ -358,6 +358,7 @@ function renderMasternodes(snapshot) {
   setText("mn-total", formatNumber(snapshot.masternode_total));
   setText("mn-upgraded", formatNumber(snapshot.masternode_upgraded_enabled));
   setText("mn-legacy", formatNumber(snapshot.masternode_legacy_enabled));
+  setText("mn-unknown", formatNumber(snapshot.masternode_unknown_enabled));
   setText("mn-upgrade-ratio", formatPercent(snapshot.upgrade_ratio));
   const tierSummary = snapshot.masternode_tiers || {};
   const tierCounts = tierSummary.counts || {};
@@ -376,12 +377,17 @@ function renderMasternodes(snapshot) {
   if (compatDiv) {
     compatDiv.innerHTML = "";
     const alertDiv = document.createElement("div");
+    const unverified = Number(snapshot.masternode_unknown_enabled || 0);
     if (snapshot.masternode_legacy_enabled > 0) {
       alertDiv.className = "alert-item warning";
-      alertDiv.innerHTML = "<strong>Some enabled masternodes may still be running legacy versions.</strong><div>They may not follow the post-fork network correctly.</div>";
+      alertDiv.textContent = "Some enabled masternodes were observed running older Core versions." +
+        (unverified > 0 ? ` Core version unverified for ${unverified} additional enabled nodes.` : "");
+    } else if (unverified > 0) {
+      alertDiv.className = "alert-item info";
+      alertDiv.textContent = `Core release unverified for ${unverified} enabled nodes. Protocol number alone cannot identify a Core patch release.`;
     } else {
       alertDiv.className = "alert-item info";
-      alertDiv.innerHTML = "<strong>Most enabled masternodes appear compatible with the post-fork network.</strong>";
+      alertDiv.textContent = "All enabled masternodes with observed Core versions meet the configured minimum release.";
     }
     compatDiv.appendChild(alertDiv);
   }
@@ -768,7 +774,7 @@ function renderSnapshot(snapshot) {
   setText("network-freshness", snapshot.freshness?.overall_status || snapshot.freshness?.status || "-");
   setText("network-difficulty", snapshot.difficulty ?? "-");
   setText("network-hashrate", snapshot.hashrate_display || "-");
-  setText("network-upgrade-summary", `${formatPercent(snapshot.upgrade_summary?.ratio)} upgraded`);
+  setText("network-upgrade-summary", `${formatPercent(snapshot.upgrade_summary?.ratio)} verified compatible · ${formatNumber(snapshot.masternode_unknown_enabled)} unverified`);
   setText("network-services-status", summarizeServices(snapshot.services || {}));
   setText("network-mempool-size", formatNumber(snapshot.mempool_txs));
   const rpcStatus = snapshot.rpc_local_status === "cooldown"
