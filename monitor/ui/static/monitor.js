@@ -353,6 +353,26 @@ function renderPeerSummary(peers) {
   });
 }
 
+function renderMasternodeTiers(snapshot) {
+  const tierSummary = snapshot.masternode_tiers || {};
+  const tierCounts = tierSummary.counts || {};
+  // Preserve the last verified server-rendered counts if a live update fails.
+  // A stale but complete tier cache is still useful when visibly labelled stale.
+  const tierKeys = ["T1", "T2", "T3", "T4", "unknown"];
+  const tierHasCounts = tierSummary.available === true &&
+    tierKeys.every((key) => Number.isSafeInteger(tierCounts[key]) && tierCounts[key] >= 0) &&
+    tierKeys.reduce((sum, key) => sum + tierCounts[key], 0) === Number(snapshot.masternode_total);
+  if (tierHasCounts) {
+    const unclassifiedContainer = byId("mn-tier-unknown-container");
+    if (unclassifiedContainer) {
+      unclassifiedContainer.style.display = tierCounts.unknown > 0 ? "" : "none";
+    }
+    tierKeys.forEach((tier) => setText(`mn-tier-${tier.toLowerCase()}`, formatNumber(tierCounts[tier])));
+    const source = tierSummary.source === "explorer_cache" ? "Explorer cache" : "Core RPC";
+    setText("mn-tier-freshness", `${source} · ${tierSummary.stale ? "stale" : "latest"}`);
+  }
+}
+
 function renderMasternodes(snapshot) {
   setText("mn-enabled", formatNumber(snapshot.masternode_enabled));
   setText("mn-total", formatNumber(snapshot.masternode_total));
@@ -360,18 +380,7 @@ function renderMasternodes(snapshot) {
   setText("mn-legacy", formatNumber(snapshot.masternode_legacy_enabled));
   setText("mn-unknown", formatNumber(snapshot.masternode_unknown_enabled));
   setText("mn-upgrade-ratio", formatPercent(snapshot.upgrade_ratio));
-  const tierSummary = snapshot.masternode_tiers || {};
-  const tierCounts = tierSummary.counts || {};
-  const tierReady = tierSummary.available && !tierSummary.stale;
-  const unclassifiedContainer = byId("mn-tier-unknown-container");
-  if (unclassifiedContainer) {
-    unclassifiedContainer.style.display = tierReady && Number(tierCounts.unknown || 0) > 0 ? "" : "none";
-  }
-  for (const tier of ["T1", "T2", "T3", "T4", "unknown"]) {
-    setText(`mn-tier-${tier.toLowerCase()}`, tierReady ? formatNumber(tierCounts[tier]) : "-");
-  }
-  const tierSource = tierSummary.source === "explorer_cache" ? "Explorer cache" : "Core RPC";
-  setText("mn-tier-freshness", tierReady ? `${tierSource} · latest` : (tierSummary.available ? `${tierSource} · stale` : "Core RPC / Explorer cache · unavailable"));
+  renderMasternodeTiers(snapshot);
 
   const compatDiv = byId("mn-compatibility-summary");
   if (compatDiv) {
@@ -1270,19 +1279,22 @@ async function fetchMasternodes() {
 }
 
 async function refreshStatus() {
-  initMyNodesControls();
   try {
     const snapshot = await fetchStatus();
+    // The tier widget must not be held hostage by an error in an unrelated
+    // chart, alert, wallet widget, or browser-local My Nodes preference.
+    renderMasternodeTiers(snapshot);
     renderSnapshot(snapshot);
   } catch (error) {
-    console.error(error);
-    byId("stale-indicator").classList.remove("hidden");
+    console.error("Monitor live status refresh failed; retaining cached HTML tiers", error);
+    const stale = byId("stale-indicator");
+    if (stale) stale.classList.remove("hidden");
   }
 }
 
 async function refreshMasternodes() {
-  initMyNodesControls();
   try {
+    initMyNodesControls();
     latestMasternodesPayload = await fetchMasternodes();
     renderMyNodes(latestMasternodesPayload);
   } catch (error) {
@@ -1296,7 +1308,7 @@ async function refreshMasternodes() {
 }
 
 async function bootstrap() {
-  initMyNodesControls();
+  // Independent polling starts even when optional My Nodes controls fail.
   await Promise.allSettled([refreshStatus(), refreshMasternodes()]);
   window.setInterval(refreshStatus, statusPollIntervalMs);
   window.setInterval(refreshMasternodes, masternodesPollIntervalMs);

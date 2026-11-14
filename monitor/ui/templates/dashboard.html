@@ -132,14 +132,14 @@
           <div class="inline-panel-section">
             <div class="panel-heading compact-heading">
               <h3>Collateral Tiers — All Known Nodes</h3>
-              <span class="panel-kicker" id="mn-tier-freshness">Waiting for tier snapshot…</span>
+              <span class="panel-kicker" id="mn-tier-freshness">{{ tier_display.label }}</span>
             </div>
             <div class="metric-grid">
-              <div class="metric"><span class="label">T1 · 10M</span><strong id="mn-tier-t1">-</strong></div>
-              <div class="metric"><span class="label">T2 · 25M</span><strong id="mn-tier-t2">-</strong></div>
-              <div class="metric"><span class="label">T3 · 50M</span><strong id="mn-tier-t3">-</strong></div>
-              <div class="metric"><span class="label">T4 · 100M</span><strong id="mn-tier-t4">-</strong></div>
-              <div class="metric" id="mn-tier-unknown-container" style="display:none"><span class="label">Unclassified</span><strong id="mn-tier-unknown">-</strong></div>
+              <div class="metric"><span class="label">T1 · 10M</span><strong id="mn-tier-t1">{{ tier_display.counts.T1 }}</strong></div>
+              <div class="metric"><span class="label">T2 · 25M</span><strong id="mn-tier-t2">{{ tier_display.counts.T2 }}</strong></div>
+              <div class="metric"><span class="label">T3 · 50M</span><strong id="mn-tier-t3">{{ tier_display.counts.T3 }}</strong></div>
+              <div class="metric"><span class="label">T4 · 100M</span><strong id="mn-tier-t4">{{ tier_display.counts.T4 }}</strong></div>
+              <div class="metric" id="mn-tier-unknown-container"{% if not tier_display.show_unknown %} style="display:none"{% endif %}><span class="label">Unclassified</span><strong id="mn-tier-unknown">{{ tier_display.counts.unknown }}</strong></div>
             </div>
           </div>
           <div class="table-wrap">
