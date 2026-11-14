@@ -92,6 +92,17 @@ class AggregationTests(unittest.TestCase):
             ],
         )
 
+    def test_pre_enabled_is_not_counted_as_enabled(self):
+        nodes = [
+            {"status": "ENABLED", "version": 70521},
+            {"status": "PRE_ENABLED", "version": 70521},
+            {"status": "NEW_START_REQUIRED", "version": 70521},
+        ]
+        summary = build_masternode_summary(nodes, {"enabled": 1, "total": 3}, "2.9.0.2", [])
+        self.assertEqual(summary["enabled"], 1)
+        self.assertEqual(sum(row["count"] for row in summary["versions"]), 1)
+        self.assertEqual(summary["total"], 3)
+
     def test_build_masternode_summary_without_peerinfo_keeps_protocol_only(self):
         masternodes = [
             {"status": "ENABLED", "version": 70521},

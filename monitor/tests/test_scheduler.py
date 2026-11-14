@@ -448,6 +448,20 @@ class SchedulerGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(bowser["stratum_ok"])
         self.assertEqual(snapshot["services"]["mining_pool_summary"]["healthy_stratum_pools"], 5)
 
+    async def test_missing_tier_rpc_does_not_fabricate_counts(self):
+        sources = SpySources()
+
+        async def unsupported():
+            raise RuntimeError("unsupported tier mode")
+
+        sources.rpc_get_masternodetiers = unsupported
+        collector = MonitorCollector(build_settings(), MemoryCache(), sources, logger=logging.getLogger("test"))
+        await collector.refresh_once()
+        tiers = collector.get_status_payload()["masternode_tiers"]
+        self.assertFalse(tiers["available"])
+        self.assertTrue(tiers["stale"])
+        self.assertEqual(tiers["counts"], {})
+
     async def _fake_tiers(self):
         return {"out-1": "T1", "out-2": "T1", "out-3": "T2", "out-4": "unknown"}
 

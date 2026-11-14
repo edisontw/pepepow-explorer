@@ -163,7 +163,7 @@ def extract_host(address: str | None) -> str | None:
 
 def is_enabled_masternode(masternode: dict[str, Any]) -> bool:
     status = str(masternode.get("status") or "").upper()
-    return "ENABLE" in status
+    return status == "ENABLED"
 
 
 def _build_ip_semver_map(peers: list[dict[str, Any]]) -> dict[str, str]:
