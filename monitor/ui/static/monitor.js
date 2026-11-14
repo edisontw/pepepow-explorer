@@ -362,6 +362,10 @@ function renderMasternodes(snapshot) {
   const tierSummary = snapshot.masternode_tiers || {};
   const tierCounts = tierSummary.counts || {};
   const tierReady = tierSummary.available && !tierSummary.stale;
+  const unclassifiedContainer = byId("mn-tier-unknown-container");
+  if (unclassifiedContainer) {
+    unclassifiedContainer.style.display = tierReady && Number(tierCounts.unknown || 0) > 0 ? "" : "none";
+  }
   for (const tier of ["T1", "T2", "T3", "T4", "unknown"]) {
     setText(`mn-tier-${tier.toLowerCase()}`, tierReady ? formatNumber(tierCounts[tier]) : "-");
   }
@@ -394,7 +398,7 @@ function renderMasternodes(snapshot) {
   versions.forEach((entry) => {
     const row = document.createElement("tr");
     const tagClass = entry.is_upgraded === true ? "latest" : entry.is_upgraded === false ? "legacy" : "unknown";
-    const tagLabel = entry.is_upgraded === true ? "Latest" : entry.is_upgraded === false ? "Legacy" : "Unmapped";
+    const tagLabel = entry.is_upgraded === true ? "Compatible" : entry.is_upgraded === false ? "Legacy" : "Unverified";
     row.innerHTML = `
       <td>
         <span class="version-chip">
@@ -402,7 +406,7 @@ function renderMasternodes(snapshot) {
           <span class="version-tag ${tagClass}">${tagLabel}</span>
         </span>
       </td>
-      <td>${entry.semver || "-"}</td>
+      <td>${entry.semver || "Unverified"}</td>
       <td>${formatNumber(entry.count)}</td>
     `;
     body.appendChild(row);
@@ -1244,7 +1248,7 @@ function initMyNodesControls() {
 }
 
 async function fetchStatus() {
-  const response = await fetch(statusUrl, { headers: { Accept: "application/json" } });
+  const response = await fetch(statusUrl, { cache: "no-store", headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`status request failed: ${response.status}`);
   }
@@ -1252,7 +1256,7 @@ async function fetchStatus() {
 }
 
 async function fetchMasternodes() {
-  const response = await fetch(masternodesUrl, { headers: { Accept: "application/json" } });
+  const response = await fetch(masternodesUrl, { cache: "no-store", headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`masternodes request failed: ${response.status}`);
   }
