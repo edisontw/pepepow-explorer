@@ -110,7 +110,8 @@ def build_router(collector) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["monitor"])
 
     @router.get("/status", response_model=StatusModel)
-    async def get_status() -> dict:
+    async def get_status(response: Response) -> dict:
+        response.headers["Cache-Control"] = "no-store"
         payload = collector.get_status_payload()
         price = await _get_cached_price(collector)
         return _with_price(payload, price)
