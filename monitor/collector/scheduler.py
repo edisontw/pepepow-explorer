@@ -62,6 +62,7 @@ class MonitorCollector:
         self._split_state: dict[str, dict[str, Any]] = {}
         self._active_alerts: dict[str, dict[str, Any]] = {}
         self._latest_snapshot: dict[str, Any] = self._empty_snapshot()
+        self._latest_explorer_tier_items: list[dict[str, Any]] = []
         self._last_probe_at: dict[str, float] = {}
         self._rpc_fail_count = 0
         self._last_success_timestamp: str | None = None
@@ -217,17 +218,28 @@ class MonitorCollector:
             )
 
         if tier_b_due:
-            # Optional read-only RPC, at the existing MN cadence. Never block primary collection
-            # on unsupported/slow tier queries and never count missing data as zero.
-            if self._rpc_can_call("masternodelist-tier") and hasattr(self.sources, "rpc_get_masternodetiers"):
+            # The Explorer's completed sync already includes Core-provided tiers.
+            # Prefer its verified full roster to avoid a second, expensive RPC.
+            # A partial (e.g. 56/311) cache must never masquerade as all nodes.
+            tier_counts = self._verified_explorer_tier_counts(masternode_summary["total"])
+            if tier_counts is not None:
+                masternode_tiers = {
+                    "available": True, "stale": False, "source": "explorer_cache",
+                    "updated_at": generated_at, "counts": tier_counts,
+                }
+            elif self._rpc_can_call("masternodelist-tier") and hasattr(self.sources, "rpc_get_masternodetiers"):
                 try:
                     tier_map = await asyncio.wait_for(self.sources.rpc_get_masternodetiers(), timeout=2.5)
-                    if not tier_map:
-                        raise ValueError("empty tier map")
-                    tier_counts = {tier: 0 for tier in ("T1", "T2", "T3", "T4", "unknown")}
+                    expected = int(masternode_summary["total"])
+                    if not tier_map or (expected > 0 and len(tier_map) != expected):
+                        raise ValueError("incomplete tier map")
+                    counts = {tier: 0 for tier in ("T1", "T2", "T3", "T4", "unknown")}
                     for tier in tier_map.values():
-                        tier_counts[tier if tier in tier_counts else "unknown"] += 1
-                    masternode_tiers = {"available": True, "stale": False, "updated_at": generated_at, "counts": tier_counts}
+                        counts[tier if tier in counts else "unknown"] += 1
+                    masternode_tiers = {
+                        "available": True, "stale": False, "source": "core_rpc",
+                        "updated_at": generated_at, "counts": counts,
+                    }
                 except Exception as exc:
                     self.logger.warning("optional masternode tier RPC unavailable: %s", type(exc).__name__)
                     masternode_tiers["stale"] = True
@@ -576,6 +588,7 @@ class MonitorCollector:
 
         masternode_count = await self._source_call("explorer_local", "explorer", self.sources.explorer_get_masternodecount)
         masternode_list = await self._source_call("explorer_local", "explorer", self.sources.explorer_get_masternodelist) or []
+        self._latest_explorer_tier_items = masternode_list
 
         expected_total = int((masternode_count or {}).get("total", 0) or 0)
         explorer_incomplete = expected_total > 0 and len(masternode_list) < expected_total
@@ -622,6 +635,21 @@ class MonitorCollector:
             generated_at,
             generated_at_unix,
         )
+
+    def _verified_explorer_tier_counts(self, expected_total: int) -> dict[str, int] | None:
+        """Count only an entire, freshly fetched Explorer roster with persisted Core tiers."""
+        items = self._latest_explorer_tier_items
+        if expected_total <= 0 or len(items) != expected_total:
+            return None
+        counts = {tier: 0 for tier in ("T1", "T2", "T3", "T4", "unknown")}
+        for item in items:
+            if not isinstance(item, dict):
+                return None
+            tier = item.get("tier")
+            if tier not in counts:
+                return None
+            counts[tier] += 1
+        return counts
 
     async def _collect_site_status(
         self,
@@ -1528,7 +1556,7 @@ class MonitorCollector:
             "masternode_legacy_enabled": 0,
             "masternode_unknown_enabled": 0,
             "masternode_versions": [],
-            "masternode_tiers": {"available": False, "stale": True, "updated_at": None, "counts": {}},
+            "masternode_tiers": {"available": False, "stale": True, "source": None, "updated_at": None, "counts": {}},
             "upgrade_ratio": 0.0,
             "target_version": self.settings.target_version,
             "rpc_local_status": "ok",
@@ -1704,6 +1732,7 @@ class MonitorCollector:
             "masternode_tiers": {
                 "available": bool((snapshot.get("masternode_tiers") or {}).get("available")),
                 "stale": bool((snapshot.get("masternode_tiers") or {}).get("stale", True)),
+                "source": (snapshot.get("masternode_tiers") or {}).get("source"),
                 "counts": {
                     tier: int(((snapshot.get("masternode_tiers") or {}).get("counts") or {}).get(tier, 0))
                     for tier in ("T1", "T2", "T3", "T4", "unknown")
